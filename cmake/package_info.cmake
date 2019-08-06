@@ -5,7 +5,7 @@ set(PACKAGE_DESCRIPTION "pmTracer front-end")
 set(PACKAGE_HOMEPAGE "https://ncine.github.io")
 set(PACKAGE_REVERSE_DNS "io.github.ncine.nctracer")
 
-set(PACKAGE_INCLUDE_DIR include)
+set(PACKAGE_INCLUDE_DIRS include)
 
 set(PACKAGE_SOURCES
 	include/main.h
