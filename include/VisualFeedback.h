@@ -3,6 +3,7 @@
 
 #include <ncine/Matrix4x4.h>
 #include <ncine/Random.h>
+#include <ncine/TimeStamp.h>
 
 namespace ncine {
 
@@ -32,26 +33,40 @@ class VisualFeedback
 		};
 	};
 
+	struct Configuration
+	{
+		bool progressiveCopy = true;
+		int textureUploadMode = TextureUploadModes::TEXSUBIMAGE;
+		float textureCopyDelay = 0.0f;
+	};
+
 	VisualFeedback();
+
+	inline const Configuration &config() const { return config_; }
+	inline Configuration &config() { return config_; }
+
 	void initTexture(int width, int height);
+	void resizeTexture(int width, int height);
 	void randomizeTexture(unsigned char *pixelsPtr);
 	void progressiveUpdate();
 	void fixedUpdate();
 
+	inline void startTimer() { lastUpdateTime_ = nc::TimeStamp::now(); }
+	void update();
+
 	inline int texWidth() const { return texWidth_; }
 	inline int texHeight() const { return texHeight_; }
 	inline unsigned int texSizeInBytes() const { return texSizeInBytes_; }
-
-	inline int textureUploadMode() const { return textureUploadMode_; }
-	void setTextureUploadMode(int mode);
-
 	inline unsigned char *texPixels() { return (mapPtr_ ? mapPtr_ : pixels_.get()); }
 
   private:
+	nc::TimeStamp lastUpdateTime_;
+	float lastTextureCopy_;
+
+	Configuration config_;
 	int texWidth_;
 	int texHeight_;
 	unsigned int texSizeInBytes_;
-	int textureUploadMode_ = 0;
 
 	static const int UniformsBufferSize = 256;
 	unsigned char uniformsBuffer_[UniformsBufferSize];

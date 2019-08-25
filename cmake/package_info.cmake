@@ -14,6 +14,8 @@ set(PACKAGE_SOURCES
 	include/VisualFeedback.h
 	include/UserInterface.h
 	include/ThreadManager.h
+	include/ObjectsPool.h
+	include/LuaSerializer.h
 
 	src/main.cpp
 	src/shader_strings.cpp
@@ -21,11 +23,29 @@ set(PACKAGE_SOURCES
 	src/VisualFeedback.cpp
 	src/UserInterface.cpp
 	src/ThreadManager.cpp
+	src/ObjectsPool.cpp
+	src/LuaSerializer.cpp
 )
 
+function(callback_before_target)
+	set(PMTRACER_ROOT "/home/encelo/pmTracer" CACHE PATH "Set the path to the pmTracer root directory")
+
+	include(${PMTRACER_ROOT}/cmake/pmtracer_sources.cmake)
+	foreach(SOURCE ${PMTRACER_SOURCES})
+		list(APPEND PACKAGE_SOURCES "${PMTRACER_ROOT}/${SOURCE}")
+	endforeach()
+
+	include(${PMTRACER_ROOT}/cmake/pmtracer_headers.cmake)
+	foreach(HEADER ${PMTRACER_HEADERS})
+		list(APPEND PACKAGE_SOURCES "${PMTRACER_ROOT}/${HEADER}")
+	endforeach()
+
+	set(PACKAGE_SOURCES ${PACKAGE_SOURCES} PARENT_SCOPE)
+
+	list(APPEND PACKAGE_INCLUDE_DIRS "${PMTRACER_ROOT}/include")
+	set(PACKAGE_INCLUDE_DIRS ${PACKAGE_INCLUDE_DIRS} PARENT_SCOPE)
+endfunction()
+
 function(callback_after_target)
-	set(PMTRACER_INCLUDE_DIR "/home/encelo/pmTracer/include" CACHE PATH "Set the path to the pmTracer include directory")
-	set(PMTRACER_LIBRARY "/home/encelo/pmTracer-release/libpmTracer.a" CACHE PATH "Set the path to the pmTracer library")
-	target_include_directories(${PACKAGE_EXE_NAME} PRIVATE ${PMTRACER_INCLUDE_DIR})
-	target_link_libraries(${PACKAGE_EXE_NAME} PRIVATE ${PMTRACER_LIBRARY})
+	target_compile_features(${PACKAGE_EXE_NAME} PUBLIC cxx_std_14)
 endfunction()

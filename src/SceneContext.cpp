@@ -1,7 +1,9 @@
 #include <iostream>
 #include <fstream>
+#include <memory>
 
 #include "SceneContext.h"
+#include "ObjectsPool.h"
 
 #include "Ortographic.h"
 #include "Jittered.h"
@@ -18,31 +20,33 @@
 #include "Reflective.h"
 #include "Directional.h"
 #include "AmbientOccluder.h"
-#include "AreaLighting.h"
 #include "AreaLight.h"
 #include "Emissive.h"
 #include "Rectangle.h"
-#include "PathTrace.h"
 #include "EnvironmentLight.h"
-#include "GlobalTrace.h"
 
-#define SINGLE_THREAD (0)
-#define SINGLE_THREAD_TILED (0)
-#define MULTI_THREAD_TILED (1)
+// 0 - single thread, 1 - tiled single thread, 2 - tiled multi-thread
+#define THREADING_TYPE (2)
 
-#define AMBIENT (1)
-#define AMBIENT_OCCLUSION (0)
+#define CORNELL_BOX (1)
 
-#define POINT_LIGHTS (1)
-#define AREA_LIGHTS (0)
-#define PATH_TRACE (0)
+#if !CORNELL_BOX
+	#define AMBIENT (0)
+	#define AMBIENT_OCCLUSION (1)
+
+	#define POINT_LIGHTS (1)
+	#define AREA_LIGHTS (0)
+	#define PATH_TRACE (0)
+#endif
 
 #include <ncine/common_macros.h>
 
+///////////////////////////////////////////////////////////
+// PUBLIC FUNCTIONS
+///////////////////////////////////////////////////////////
+
 namespace {
-
 const unsigned int numSamples = 4;
-
 }
 
 void SceneContext::init(int width, int height)
@@ -50,9 +54,11 @@ void SceneContext::init(int width, int height)
 	LOGI("Poor Man's Tracer\n");
 
 	LOGI("Setting up the scene...");
-	world_.viewPlane().setDimensions(width, height);
-	//setupWorld(world_);
+#if CORNELL_BOX
 	setupCornellBox(world_);
+#else
+	setupWorld(world_);
+#endif
 	validateWorld(world_);
 
 	//std::cout << "Scene setting time: ";
@@ -61,61 +67,80 @@ void SceneContext::init(int width, int height)
 	LOGI_X("Scene statistics: %u objects, %u materials, %u lights, %u samplers",
 	       world_.objects().size(), world_.materials().size(), world_.lights().size(), world_.samplers().size());
 
-	world_.viewPlane().setPixelSize(0.004f);
+	world_.viewPlane().setDimensions(width, height);
+	world_.viewPlane().editPixelSize() = 0.004f;
 
-	camera_.setEye(278.0f, 273.0f, -800.0f);
-	camera_.setUp(0.0f, 1.0f, 0.0f);
-	camera_.setLookAt(278.0f, 273.0f, 0.0f);
-	camera_.setViewDistance(4.0f);
-	camera_.computeUvw();
+	config_.camera = objectsPool().retrieveCamera(pm::Camera::Type::PINHOLE);
+	pm::PinHole *camera = static_cast<pm::PinHole *>(config_.camera);
+#if CORNELL_BOX
+	camera->editEye().set(278.0f, 273.0f, -800.0f);
+	camera->editUp().set(0.0f, 1.0f, 0.0f);
+	camera->editLookAt().set(278.0f, 273.0f, 0.0f);
+	camera->editViewDistance() = 4.0f;
+#else
+	camera->editEye().set(0.0f, 2.0f, -8.0f);
+	camera->editUp().set(0.0f, 1.0f, 0.0f);
+	camera->editLookAt().set(0.0f, 2.0f, 0.0f);
+	camera->editViewDistance() = 4.0f;
+#endif
+	camera->computeUvw();
 
-	/*
-		//pm::Ortographic camera;
-		world.viewPlane().setPixelSize(0.005f);
+#if 0
+	//pm::Ortographic camera;
+	world.viewPlane().setPixelSize(0.005f);
 
-		pm::PinHole camera;
-		camera.setEye(0.0f, 1.0f, -5.0f);
-		camera.setUp(0.0f, 1.0f, 0.0f);
-		camera.setLookAt(0.0f, 1.0f, 0.0f);
-		camera.setViewDistance(4.0f);
-		camera.computeUvw();
-		camera.setExposureTime(1.0f);
-	*/
+	pm::PinHole camera;
+	camera.setEye(0.0f, 1.0f, -5.0f);
+	camera.setUp(0.0f, 1.0f, 0.0f);
+	camera.setLookAt(0.0f, 1.0f, 0.0f);
+	camera.setViewDistance(4.0f);
+	camera.computeUvw();
+	camera.setExposureTime(1.0f);
+#endif
 
-	frame_ = nctl::makeUnique<pm::RGBColor[]>(width * height);
-
-	retrieveConfig();
+	resizeFrame(width, height);
 }
 
-void SceneContext::trace()
+void SceneContext::resizeFrame(int width, int height)
 {
-	applyConfig();
+	FATAL_ASSERT(width > 0);
+	FATAL_ASSERT(height > 0);
 
+	if (width * height != frameNumPixels_)
+	{
+		frameNumPixels_ = width * height;
+		frame_ = nctl::makeUnique<pm::RGBColor[]>(frameNumPixels_);
+	}
+}
+
+void SceneContext::startTracing()
+{
 	LOGI("Rendering started");
-	timer_.start();
+	tracingStartTime_ = nc::TimeStamp::now();
 
-#if SINGLE_THREAD
+#if THREADING_TYPE == 0
 	LOGI(" with one thread...");
 	camera_.renderScene(world_, frame_.get());
-#elif SINGLE_THREAD_TILED
+#elif THREADING_TYPE == 1
 	LOGI(" with one thread (tiled)...");
 	for (int i = 0; i < height; i += tileSize)
 		for (int j = 0; j < width; j += tileSize)
 			camera_.renderScene(world_, frame_.get(), j, i, tileSize);
-#elif MULTI_THREAD_TILED
+#elif THREADING_TYPE == 2
 	LOGI_X(" with %u threads...", config_.numThreads);
 
 	ThreadManager::Configuration &threadsConfig = threads_.config();
 	threadsConfig.numThreads = config_.numThreads;
 	threadsConfig.tileSize = config_.tileSize;
 	threadsConfig.world = &world_;
-	threadsConfig.camera = &camera_;
+	threadsConfig.tracer = objectsPool().retrieveTracer(config_.tracerType);
+	threadsConfig.camera = config_.camera;
 	threadsConfig.frame = frame_.get();
 
 	threads_.start();
 #endif
 
-	//LOGI_X("Rendering time: %f.2s", timer_.interval());
+	//LOGI_X("Rendering time: %f.2s", tracingStartTime_.secondsSince());
 
 	// Save output to PBM ascii format
 	//startTime = std::chrono::high_resolution_clock::now();
@@ -137,6 +162,7 @@ void SceneContext::copyToTexture(unsigned char *pixelsPtr)
 		for (int c = 0; c < width; c++)
 		{
 			const unsigned int index = r * width + c;
+			ASSERT(index < frameNumPixels_);
 			const pm::RGBColor &pixel = frame_[index];
 
 			// Tonemapping
@@ -161,15 +187,33 @@ void SceneContext::reset()
 		for (int c = 0; c < width; c++)
 		{
 			const unsigned int index = r * width + c;
+			ASSERT(index < frameNumPixels_);
 			frame_[index].set(0.0f, 0.0f, 0.0f);
 		}
+	}
+}
+
+void SceneContext::showSampler(pm::Sampler *sampler)
+{
+	const int width = world_.viewPlane().width();
+	const int height = world_.viewPlane().height();
+	const int minDim = (height < width) ? height : width;
+
+	static unsigned long jump = 0;
+	static int count = 0;
+	for (unsigned int i = 0; i < sampler->numSamples(); i++)
+	{
+		pm::Vector2 vec = sampler->sampleUnitSquare(jump, count);
+		const unsigned int index = static_cast<unsigned int>(vec.y * minDim * width + vec.y * minDim);
+		ASSERT(index < frameNumPixels_);
+		frame_[index].set(1.0f, 1.0f, 1.0f);
 	}
 }
 
 float SceneContext::tracingTime() const
 {
 	if (threads_.threadsRunning())
-		tracingTime_ = timer_.interval();
+		tracingTime_ = tracingStartTime_.secondsSince();
 	return tracingTime_;
 }
 
@@ -186,7 +230,9 @@ void SceneContext::savePbm(const char *filename)
 	{
 		for (int j = 0; j < width; j++)
 		{
-			const pm::RGBColor &pixel = frame_[i * width + j];
+			const unsigned int index = static_cast<unsigned int>(i * width + j);
+			ASSERT(index < frameNumPixels_);
+			const pm::RGBColor &pixel = frame_[index];
 
 			// Tonemapping
 			pm::RGBColor tonemapped = pixel * 16.0f;
@@ -202,38 +248,22 @@ void SceneContext::savePbm(const char *filename)
 	file.close();
 }
 
-void SceneContext::applyConfig()
+void SceneContext::setCameraType(pm::Camera::Type type)
 {
-	world_.viewPlane().setMaxDepth(config_.maxDepth);
-	camera_.eye().set(config_.cameraEye);
-	camera_.lookAt().set(config_.cameraLookAt);
-	camera_.up().set(config_.cameraUp);
-	camera_.exposureTime() = config_.cameraExposure;
-	camera_.computeUvw();
-
-	currentConfig_ = config_;
+	if (type != config_.camera->type())
+	{
+		pm::Camera *newCamera = objectsPool().retrieveCamera(type);
+		newCamera->editEye() = config_.camera->eye();
+		newCamera->editLookAt() = config_.camera->lookAt();
+		newCamera->editUp() = config_.camera->up();
+		newCamera->editExposureTime() = config_.camera->exposureTime();
+		config_.camera = newCamera;
+	}
 }
 
-void SceneContext::retrieveConfig()
-{
-	config_.maxDepth = world_.viewPlane().maxDepth();
-
-	config_.cameraEye[0] = camera_.eye().x;
-	config_.cameraEye[1] = camera_.eye().y;
-	config_.cameraEye[2] = camera_.eye().z;
-
-	config_.cameraLookAt[0] = camera_.lookAt().x;
-	config_.cameraLookAt[1] = camera_.lookAt().y;
-	config_.cameraLookAt[2] = camera_.lookAt().z;
-
-	config_.cameraUp[0] = camera_.up().x;
-	config_.cameraUp[1] = camera_.up().y;
-	config_.cameraUp[2] = camera_.up().z;
-
-	config_.cameraExposure = camera_.exposureTime();
-
-	currentConfig_ = config_;
-}
+///////////////////////////////////////////////////////////
+// PRIVATE FUNCTIONS
+///////////////////////////////////////////////////////////
 
 std::unique_ptr<pm::Rectangle> rectangleFromVertices(const pm::Vector3 pA, const pm::Vector3 pB, const pm::Vector3 pC)
 {
@@ -243,12 +273,12 @@ std::unique_ptr<pm::Rectangle> rectangleFromVertices(const pm::Vector3 pA, const
 
 void SceneContext::setupWorld(pm::World &world)
 {
-	world.setTracer(std::make_unique<pm::AreaLighting>(world));
-	//world.setTracer(std::make_unique<pm::PathTrace>(world));
+	config_.tracerType = pm::Tracer::Type::AREALIGHTING;
+	//config_.tracerType = pm::Tracer::Type::PATHTRACE;
 
 	auto vpSampler = world.createSampler<pm::NRooks>(numSamples);
 	world.viewPlane().setSampler(vpSampler);
-	world.viewPlane().setMaxDepth(5);
+	world.viewPlane().editMaxDepth() = 5;
 
 	auto hammersley = world.createSampler<pm::NRooks>(numSamples);
 
@@ -382,25 +412,28 @@ void SceneContext::setupWorld(pm::World &world)
 
 void SceneContext::setupCornellBox(pm::World &world)
 {
-	world.setTracer(std::make_unique<pm::PathTrace>(world));
+	config_.tracerType = pm::Tracer::Type::PATHTRACE;
 
 	auto vpSampler = world.createSampler<pm::MultiJittered>(64);
 	world.viewPlane().setSampler(vpSampler);
-	world.viewPlane().setMaxDepth(5);
+	world.viewPlane().editMaxDepth() = 5;
 
-	auto hammersley = world.createSampler<pm::Hammersley>(256);
+	auto hammersley = world.createSampler<pm::Hammersley>(64);
 
 	// Materials
 	auto white = world.createMaterial<pm::Matte>();
 	white->setCd(0.7f, 0.7f, 0.7f);
+	white->ambient().setSampler(hammersley);
 	white->diffuse().setSampler(hammersley);
 
 	auto red = world.createMaterial<pm::Matte>();
 	red->setCd(0.7f, 0.0f, 0.0f);
+	red->ambient().setSampler(hammersley);
 	red->diffuse().setSampler(hammersley);
 
 	auto green = world.createMaterial<pm::Matte>();
 	green->setCd(0.0f, 0.7f, 0.0f);
+	green->ambient().setSampler(hammersley);
 	green->diffuse().setSampler(hammersley);
 
 	auto emissive = world.createMaterial<pm::Emissive>();
@@ -484,6 +517,43 @@ void SceneContext::validateWorld(const pm::World &world)
 		{
 			LOGE("Missing material!");
 			exit(EXIT_FAILURE);
+		}
+	}
+
+	for (const auto &material : world.materials())
+	{
+		if (material->type() == pm::Material::Type::MATTE)
+		{
+			const pm::Matte *matte = static_cast<pm::Matte *>(material.get());
+			if (matte->ambient().sampler() == nullptr)
+			{
+				LOGE("Missing ambient sampler from matte material!");
+				exit(EXIT_FAILURE);
+			}
+			else if (matte->diffuse().sampler() == nullptr)
+			{
+				LOGE("Missing diffuse sampler from matte material!");
+				exit(EXIT_FAILURE);
+			}
+		}
+		else if (material->type() == pm::Material::Type::PHONG)
+		{
+			const pm::Phong *phong = static_cast<pm::Phong *>(material.get());
+			if (phong->ambient().sampler() == nullptr)
+			{
+				LOGE("Missing ambient sampler from phong material!");
+				exit(EXIT_FAILURE);
+			}
+			else if (phong->diffuse().sampler() == nullptr)
+			{
+				LOGE("Missing diffuse sampler from phong material!");
+				exit(EXIT_FAILURE);
+			}
+			else if (phong->specular().sampler() == nullptr)
+			{
+				LOGE("Missing specular sampler from phong material!");
+				exit(EXIT_FAILURE);
+			}
 		}
 	}
 }

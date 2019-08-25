@@ -1,33 +1,66 @@
 #include "ThreadManager.h"
 
+#if !STD_THREADS
+	#include <nctl/String.h>
+#endif
+
 #include "World.h"
 #include "Camera.h"
 
 namespace {
-
-bool stopThreads = false;
-
+	bool stopThreads = false;
 }
+
+///////////////////////////////////////////////////////////
+// PUBLIC FUNCTIONS
+///////////////////////////////////////////////////////////
 
 void ThreadManager::start()
 {
 	const unsigned int numThreads = config_.numThreads;
 
 	stopThreads = false;
+#if STD_THREADS
 	threads_.reserve(numThreads);
 	tls_.resize(numThreads);
 
 	for (unsigned int i = 0; i < numThreads; i++)
 		threads_.emplace_back(threadFunc, i, std::ref(config_), std::ref(tls_[i]));
+#else
+	if (threads_.capacity() < numThreads)
+		threads_.setCapacity(numThreads);
+	if (tls_.capacity() < numThreads)
+		tls_.setCapacity(numThreads);
+	if (args_.capacity() < numThreads)
+		args_.setCapacity(numThreads);
+
+	for (unsigned int i = 0; i < numThreads; i++)
+	{
+		args_.pushBack(ThreadArg(i, &config_, &tls_[i]));
+		threads_[i].run(threadFunc, &args_.back());
+#if !defined(__ANDROID__) && !defined(__EMSCRIPTEN__)
+		threads_[i].setAffinityMask(nc::ThreadAffinityMask(i));
+#endif
+	}
+#endif
 }
 
 void ThreadManager::stop()
 {
 	stopThreads = true;
+#if STD_THREADS
 	for (unsigned int i = 0; i < threads_.size(); i++)
 		threads_[i].join();
 
 	threads_.clear();
+#else
+	for (unsigned int i = 0; i < threads_.size(); i++)
+		threads_[i].join();
+
+	threads_.clear();
+	tls_.clear();
+	args_.clear();
+#endif
 }
 
 bool ThreadManager::threadsRunning() const
@@ -54,8 +87,27 @@ float ThreadManager::progress() const
 	return totalProgress;
 }
 
+///////////////////////////////////////////////////////////
+// PRIVATE FUNCTIONS
+///////////////////////////////////////////////////////////
+
+#if STD_THREADS
 void ThreadManager::threadFunc(int id, Configuration &conf, LocalStorage &tls)
 {
+#else
+void ThreadManager::threadFunc(void *arg)
+{
+	ThreadArg *threadArg = reinterpret_cast<ThreadArg *>(arg);
+	const int id = threadArg->id_;
+	const Configuration &conf = *threadArg->conf_;
+	LocalStorage &tls = *threadArg->tls_;
+
+	#if !defined(__EMSCRIPTEN__)
+	nctl::String threadName;
+	threadName.format("Thread#%2.d", id);
+	nc::Thread::setSelfName(threadName.data());
+	#endif
+#endif
 	tls.hasFinished = false;
 	tls.progress = 0.0f;
 
@@ -93,7 +145,7 @@ void ThreadManager::threadFunc(int id, Configuration &conf, LocalStorage &tls)
 		const int tileSizeX = (startX + conf.tileSize > width) ? width - startX : conf.tileSize;
 		const int tileSizeY = (startY + conf.tileSize > height) ? height - startY : conf.tileSize;
 
-		conf.camera->renderScene(*conf.world, conf.frame, startX, startY, tileSizeX, tileSizeY, true);
+		conf.camera->renderScene(*conf.world, *conf.tracer, conf.frame, startX, startY, tileSizeX, tileSizeY, true);
 		iteration++;
 
 		tls.progress = 1.0f / static_cast<float>(maxSamples) * (sample + iteration / static_cast<float>(numColumns * numRows));

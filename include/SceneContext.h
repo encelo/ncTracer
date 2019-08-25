@@ -2,11 +2,12 @@
 #define CLASS_SCENE_CONTEXT
 
 #include <nctl/UniquePtr.h>
-#include <ncine/Timer.h>
+#include <ncine/TimeStamp.h>
 
 #include "ThreadManager.h"
 
 #include "World.h"
+#include "Tracer.h"
 #include "PinHole.h"
 #include "RGBColor.h"
 
@@ -22,24 +23,30 @@ class SceneContext
 		bool copyTexture = true;
 
 		// Tracing configuration
+#if STD_THREADS
 		int maxThreads = static_cast<int>(std::thread::hardware_concurrency());
+#else
+		int maxThreads = static_cast<int>(nc::Thread::numProcessors());
+#endif
 		int numThreads = maxThreads - 1;
 		int tileSize = 16;
-		int maxDepth = 2;
 
-		float cameraEye[3] = { 0.0f, 0.0f, -10.0f };
-		float cameraLookAt[3] = { 0.0f, 0.0f, 0.0f };
-		float cameraUp[3] = { 0.0f, 1.0f, 0.0f };
-		float cameraExposure = 1.0f;
+		pm::Tracer::Type tracerType = pm::Tracer::Type::PATHTRACE;
+		pm::Camera *camera = nullptr;
 	};
+
+	SceneContext()
+	    : tracingTime_(0.0f), frameNumPixels_(0) {}
 
 	inline const Configuration &config() const { return config_; }
 	inline Configuration &config() { return config_; }
 
 	void init(int width, int height);
-	void trace();
+	void resizeFrame(int width, int height);
+	void startTracing();
 	void copyToTexture(unsigned char *pixelsPtr);
 
+	void showSampler(pm::Sampler *sampler);
 	void reset();
 	inline void stopTracing() { threads_.stop(); }
 	inline bool isTracing() const { return threads_.threadsRunning(); }
@@ -47,22 +54,20 @@ class SceneContext
 	float tracingTime() const;
 	void savePbm(const char *filename);
 
+	inline const pm::World &world() const { return world_; }
 	inline pm::World &world() { return world_; }
-	inline pm::Camera &camera() { return camera_; }
+
+	void setCameraType(pm::Camera::Type type);
 
   private:
 	Configuration config_;
-	Configuration currentConfig_;
-	nc::Timer timer_;
+	nc::TimeStamp tracingStartTime_;
 	mutable float tracingTime_;
 	ThreadManager threads_;
 
 	pm::World world_;
-	pm::PinHole camera_;
+	unsigned int frameNumPixels_;
 	nctl::UniquePtr<pm::RGBColor[]> frame_;
-
-	void applyConfig();
-	void retrieveConfig();
 
 	void setupWorld(pm::World &world);
 	void setupCornellBox(pm::World &world);

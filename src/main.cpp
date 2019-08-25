@@ -28,8 +28,8 @@ void MyEventHandler::onPreInit(nc::AppConfiguration &config)
 	config.dataPath() = dataPath;
 #endif
 
-	config.xResolution = imageWidth;
-	config.yResolution = imageHeight;
+	config.resolution.x = imageWidth;
+	config.resolution.y = imageHeight;
 
 	config.withScenegraph = false;
 	config.withAudio = false;
@@ -39,6 +39,7 @@ void MyEventHandler::onPreInit(nc::AppConfiguration &config)
 	config.vaoPoolSize = 2;
 
 	config.windowTitle = "ncTracer";
+	config.windowIconFilename = "icon48.png";
 
 	config.consoleLogLevel = nc::ILogger::LogLevel::WARN;
 }
@@ -50,7 +51,6 @@ void MyEventHandler::onInit()
 
 	sc_ = nctl::makeUnique<SceneContext>();
 	sc_->init(imageWidth, imageHeight);
-	sc_->trace();
 
 	ui_ = nctl::makeUnique<UserInterface>(*vf_, *sc_);
 }
@@ -62,16 +62,12 @@ void MyEventHandler::onShutdown()
 
 void MyEventHandler::onFrameStart()
 {
-	const SceneContext::Configuration &conf = sc_->config();
+	const VisualFeedback::Configuration &vfConf = vf_->config();
 
-	if (conf.copyTexture)
-	{
+	if (vfConf.progressiveCopy)
 		sc_->copyToTexture(vf_->texPixels());
-		vf_->progressiveUpdate();
-	}
-	else
-		vf_->fixedUpdate();
 
+	vf_->update();
 	ui_->createGuiMainWindow();
 }
 
