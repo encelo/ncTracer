@@ -1,7 +1,7 @@
 #ifndef CLASS_VISUALFEEDBACK
 #define CLASS_VISUALFEEDBACK
 
-#include <ncine/Matrix4x4.h>
+#include <nctl/UniquePtr.h>
 #include <ncine/Random.h>
 #include <ncine/TimeStamp.h>
 
@@ -81,9 +81,6 @@ class VisualFeedback
 
 	nctl::UniquePtr<nc::GLBufferObject> pbo_;
 	unsigned char *mapPtr_;
-
-	nc::Matrix4x4f projection_;
-	nc::Matrix4x4f modelView_;
 };
 
 #endif

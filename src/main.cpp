@@ -4,7 +4,6 @@
 #include "SceneContext.h"
 
 #include <ncine/Application.h>
-#include <ncine/IFile.h>
 
 namespace {
 

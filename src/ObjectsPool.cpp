@@ -20,6 +20,8 @@ pm::Tracer *ObjectsPool::retrieveTracer(pm::Tracer::Type type)
 		case pm::Tracer::Type::PATHTRACE: return &pathTraceTracer_;
 		case pm::Tracer::Type::GLOBALTRACE: return &globalTraceTracer_;
 	}
+
+	return &globalTraceTracer_;
 }
 
 pm::Camera *ObjectsPool::retrieveCamera(pm::Camera::Type type)
@@ -29,4 +31,6 @@ pm::Camera *ObjectsPool::retrieveCamera(pm::Camera::Type type)
 		case pm::Camera::Type::ORTOGRAPHIC: return &ortographicCamera_;
 		case pm::Camera::Type::PINHOLE: return &pinHoleCamera_;
 	}
+
+	return &pinHoleCamera_;
 }

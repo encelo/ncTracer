@@ -1,4 +1,5 @@
 #include "VisualFeedback.h"
+#include <ncine/Matrix4x4.h>
 #include <ncine/GLShaderProgram.h>
 #include <ncine/GLShaderUniforms.h>
 #include <ncine/GLShaderAttributes.h>
@@ -8,7 +9,7 @@
 #include "shader_strings.h"
 
 ///////////////////////////////////////////////////////////
-// PUBLIC FUNCTIONS
+// CONSTRUCTORS and DESTRUCTOR
 ///////////////////////////////////////////////////////////
 
 VisualFeedback::VisualFeedback()
@@ -24,24 +25,26 @@ VisualFeedback::VisualFeedback()
 	texUniforms_->setUniformsDataPointer(uniformsBuffer_);
 	texUniforms_->uniform("uTexture")->setIntValue(0);
 	texAttributes_ = nctl::makeUnique<nc::GLShaderAttributes>(texProgram_.get());
-	texUniforms_->uniform("texRect")->setFloatValue(1.0f, 0.0f, -1.0f, 0.0f);
 
 	FATAL_ASSERT(UniformsBufferSize >= texProgram_->uniformsSize());
 
 	pbo_ = nctl::makeUnique<nc::GLBufferObject>(GL_PIXEL_UNPACK_BUFFER);
 }
 
+///////////////////////////////////////////////////////////
+// PUBLIC FUNCTIONS
+///////////////////////////////////////////////////////////
+
 void VisualFeedback::initTexture(int width, int height)
 {
 	resizeTexture(width, height);
 
-	texUniforms_->uniform("spriteSize")->setFloatValue(width, height);
+	texUniforms_->uniform("size")->setFloatValue(width, height);
 
-	projection_ = nc::Matrix4x4f::ortho(0.0f, width, 0.0f, height, 0.0f, 1.0f);
-	texUniforms_->uniform("projection")->setFloatVector(projection_.data());
-	modelView_ = nc::Matrix4x4f::Identity;
-	modelView_ *= nc::Matrix4x4f::translation(width * 0.5f, height * 0.5f, 0.0f);
-	texUniforms_->uniform("modelView")->setFloatVector(modelView_.data());
+	nc::Matrix4x4f projection = nc::Matrix4x4f::ortho(0.0f, width, 0.0f, height, 0.0f, 1.0f);
+	texUniforms_->uniform("projection")->setFloatVector(projection.data());
+	nc::Matrix4x4f modelView = nc::Matrix4x4f::translation(width * 0.5f, height * 0.5f, 0.0f);
+	texUniforms_->uniform("modelView")->setFloatVector(modelView.data());
 	texUniforms_->commitUniforms();
 }
 
@@ -57,6 +60,7 @@ void VisualFeedback::resizeTexture(int width, int height)
 
 		pixels_ = nctl::makeUnique<unsigned char[]>(texSizeInBytes_);
 		pbo_->bufferData(texSizeInBytes_, nullptr, GL_STREAM_DRAW);
+		pbo_->unbind();
 
 		texture_ = nctl::makeUnique<nc::GLTexture>(GL_TEXTURE_2D);
 		texture_->texStorage2D(1, GL_RGB8, width, height);

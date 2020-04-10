@@ -28,10 +28,6 @@
 #include "Hammersley.h"
 #include "Halton.h"
 
-///////////////////////////////////////////////////////////
-// PUBLIC FUNCTIONS
-///////////////////////////////////////////////////////////
-
 namespace {
 
 int inputTextCallback(ImGuiInputTextCallbackData *data)
@@ -55,6 +51,7 @@ const char *geometryTypeToString(pm::Geometry::Type type)
 		case pm::Geometry::Type::SPHERE: return "Sphere";
 		case pm::Geometry::Type::RECTANGLE: return "Rectangle";
 	}
+	return "Unknown";
 }
 
 const char *materialTypeToString(pm::Material::Type type)
@@ -65,6 +62,7 @@ const char *materialTypeToString(pm::Material::Type type)
 		case pm::Material::Type::PHONG: return "Phong";
 		case pm::Material::Type::EMISSIVE: return "Emissive";
 	}
+	return "Unknown";
 }
 
 const char *lightTypeToString(pm::Light::Type type)
@@ -78,6 +76,7 @@ const char *lightTypeToString(pm::Light::Type type)
 		case pm::Light::Type::AREA: return "Area";
 		case pm::Light::Type::ENVIRONMENT: return "Environment";
 	}
+	return "Unknown";
 }
 
 const char *samplerTypeToString(pm::Sampler::Type type)
@@ -92,9 +91,14 @@ const char *samplerTypeToString(pm::Sampler::Type type)
 		case pm::Sampler::Type::HAMMERSLEY: return "Hammersley";
 		case pm::Sampler::Type::HALTON: return "Halton";
 	}
+	return "Unknown";
 }
 
 }
+
+///////////////////////////////////////////////////////////
+// CONSTRUCTORS and DESTRUCTOR
+///////////////////////////////////////////////////////////
 
 UserInterface::UserInterface(VisualFeedback &vf, SceneContext &sc)
     : auxString_(MaxStringLength), filename_(MaxStringLength), vf_(vf), sc_(sc)
@@ -108,6 +112,10 @@ UserInterface::UserInterface(VisualFeedback &vf, SceneContext &sc)
 	io.FontGlobalScale = 2.0f;
 #endif
 }
+
+///////////////////////////////////////////////////////////
+// PUBLIC FUNCTIONS
+///////////////////////////////////////////////////////////
 
 void UserInterface::createGuiMainWindow()
 {
@@ -208,7 +216,11 @@ void UserInterface::createGuiMainWindow()
 			LuaSerializer::save(filename_.data(), world);
 		ImGui::SameLine();
 		if (ImGui::Button("Clear"))
+		{
+			if (sc_.isTracing())
+				sc_.stopTracing();
 			world.clear();
+		}
 
 		ImGui::ColorEdit3("Background", world.editBackground().data());
 
@@ -386,8 +398,14 @@ void UserInterface::createGuiMainWindow()
 		sc_.startTracing();
 	}
 
-	if (!sc_.isTracing() && ImGui::Button("Save PBM"))
-		sc_.savePbm("image.pbm");
+	if (!sc_.isTracing())
+	{
+		if (ImGui::Button("Save PBM"))
+			sc_.savePbm("image.pbm");
+		ImGui::SameLine();
+		if (ImGui::Button("Save PNG"))
+			sc_.savePng("image.png");
+	}
 
 	ImGui::End();
 }
@@ -400,25 +418,32 @@ void UserInterface::createSamplerGuiTree(pm::Sampler *sampler)
 {
 	ASSERT(sampler);
 
-	ImGui::Text(auxString_.data());
-	ImGui::SameLine();
-	static int numSamples = sampler->numSamples();
-	ImGui::PushItemWidth(100.0f);
-	ImGui::InputInt("Samples", &numSamples);
-	ImGui::PopItemWidth();
-	ImGui::SameLine();
-	if (ImGui::Button("Apply"))
-		sampler->resize(numSamples);
-	ImGui::SameLine();
-	if (ImGui::Button("Reset"))
-		numSamples = sampler->numSamples();
-	ImGui::SameLine();
-	if (ImGui::Button("Show"))
+	ImGui::PushID(reinterpret_cast<const void *>(sampler));
+
+	if (ImGui::TreeNode(auxString_.data()))
 	{
-		sc_.stopTracing();
-		sc_.reset();
-		sc_.showSampler(sampler);
+		static int numSamples = sampler->numSamples();
+		ImGui::PushItemWidth(100.0f);
+		ImGui::InputInt("Samples", &numSamples);
+		ImGui::PopItemWidth();
+		ImGui::SameLine();
+		if (ImGui::Button("Apply"))
+			sampler->resize(numSamples);
+		ImGui::SameLine();
+		if (ImGui::Button("Reset"))
+			numSamples = sampler->numSamples();
+		ImGui::SameLine();
+		if (ImGui::Button("Show"))
+		{
+			sc_.stopTracing();
+			sc_.reset();
+			sc_.showSampler(sampler);
+		}
+
+		ImGui::TreePop();
 	}
+
+	ImGui::PopID();
 }
 
 bool UserInterface::createLightGuiTree(pm::Light *light)

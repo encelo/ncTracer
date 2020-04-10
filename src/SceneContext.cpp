@@ -25,6 +25,8 @@
 #include "Rectangle.h"
 #include "EnvironmentLight.h"
 
+#include <ncine/TextureSaverPng.h>
+
 // 0 - single thread, 1 - tiled single thread, 2 - tiled multi-thread
 #define THREADING_TYPE (2)
 
@@ -41,13 +43,13 @@
 
 #include <ncine/common_macros.h>
 
-///////////////////////////////////////////////////////////
-// PUBLIC FUNCTIONS
-///////////////////////////////////////////////////////////
-
 namespace {
 const unsigned int numSamples = 4;
 }
+
+///////////////////////////////////////////////////////////
+// PUBLIC FUNCTIONS
+///////////////////////////////////////////////////////////
 
 void SceneContext::init(int width, int height)
 {
@@ -246,6 +248,43 @@ void SceneContext::savePbm(const char *filename)
 		file << "\n";
 	}
 	file.close();
+}
+
+void SceneContext::savePng(const char *filename)
+{
+	const int width = world_.viewPlane().width();
+	const int height = world_.viewPlane().height();
+	const float invGamma = 1.0f / 2.2f;
+
+	nctl::UniquePtr<uint8_t []> intPixels = nctl::makeUnique<uint8_t []>(width * height * 3);
+	for (unsigned int i = 0; i < height; i++)
+	{
+		for (int j = 0; j < width; j++)
+		{
+			const unsigned int index = static_cast<unsigned int>(i * width + j);
+			ASSERT(index < frameNumPixels_);
+			const pm::RGBColor &pixel = frame_[index];
+
+			// Tonemapping
+			pm::RGBColor tonemapped = pixel * 16.0f;
+			tonemapped = tonemapped / (pm::RGBColor(1.0f, 1.0f, 1.0f) + tonemapped);
+			tonemapped.pow(invGamma);
+
+			// Vertical flipping
+			const unsigned int intIndex = static_cast<unsigned int>((height - i - 1) * width + j);
+			intPixels[intIndex * 3 + 0] = uint8_t(tonemapped.r * 255);
+			intPixels[intIndex * 3 + 1] = uint8_t(tonemapped.g * 255);
+			intPixels[intIndex * 3 + 2] = uint8_t(tonemapped.b * 255);
+		}
+	}
+
+	nc::TextureSaverPng saver;
+	nc::TextureSaverPng::Properties props;
+	props.width = width;
+	props.height = height;
+	props.format = nc::TextureSaverPng::Format::RGB8;
+	props.pixels = intPixels.get();
+	saver.saveToFile(props, filename);
 }
 
 void SceneContext::setCameraType(pm::Camera::Type type)
