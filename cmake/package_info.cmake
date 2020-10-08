@@ -19,6 +19,7 @@ set(PACKAGE_SOURCES
 	include/LuaSerializer.h
 
 	src/main.cpp
+	src/build_world.cpp
 	src/shader_strings.cpp
 	src/SceneContext.cpp
 	src/VisualFeedback.cpp
@@ -29,7 +30,18 @@ set(PACKAGE_SOURCES
 )
 
 function(callback_before_target)
-	set(PMTRACER_ROOT "/home/encelo/pmTracer" CACHE PATH "Set the path to the pmTracer root directory")
+	get_filename_component(PARENT_DIRECTORY ${CMAKE_SOURCE_DIR} DIRECTORY)
+	if(NOT CMAKE_SYSTEM_NAME STREQUAL "Android")
+		set(PMTRACER_ROOT "${PARENT_DIRECTORY}/pmTracer" CACHE PATH "The path to the pmTracer root directory")
+
+		if(IS_DIRECTORY ${PMTRACER_ROOT}/cmake AND IS_DIRECTORY ${PMTRACER_ROOT}/include AND IS_DIRECTORY ${PMTRACER_ROOT}/src)
+			file(COPY ${PMTRACER_ROOT}/cmake DESTINATION ${CMAKE_BINARY_DIR}/android/src/main/pmTracer)
+			file(COPY ${PMTRACER_ROOT}/include DESTINATION ${CMAKE_BINARY_DIR}/android/src/main/pmTracer)
+			file(COPY ${PMTRACER_ROOT}/src DESTINATION ${CMAKE_BINARY_DIR}/android/src/main/pmTracer)
+		endif()
+	else()
+		set(PMTRACER_ROOT "${PARENT_DIRECTORY}/pmTracer")
+	endif()
 
 	include(${PMTRACER_ROOT}/cmake/pmtracer_sources.cmake)
 	foreach(SOURCE ${PMTRACER_SOURCES})

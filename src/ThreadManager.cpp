@@ -8,7 +8,9 @@
 #include "Camera.h"
 
 namespace {
-	bool stopThreads = false;
+
+bool stopThreads = false;
+
 }
 
 ///////////////////////////////////////////////////////////
@@ -36,11 +38,13 @@ void ThreadManager::start()
 
 	for (unsigned int i = 0; i < numThreads; i++)
 	{
-		args_.pushBack(ThreadArg(i, &config_, &tls_[i]));
-		threads_[i].run(threadFunc, &args_.back());
-#if !defined(__ANDROID__) && !defined(__EMSCRIPTEN__)
-		threads_[i].setAffinityMask(nc::ThreadAffinityMask(i));
-#endif
+		tls_.emplaceBack();
+		args_.emplaceBack(i, &config_, &tls_[i]);
+		threads_.emplaceBack();
+		threads_.back().run(threadFunc, &args_.back());
+	#if !defined(__ANDROID__) && !defined(__EMSCRIPTEN__)
+		threads_.back().setAffinityMask(nc::ThreadAffinityMask(i));
+	#endif
 	}
 #endif
 }

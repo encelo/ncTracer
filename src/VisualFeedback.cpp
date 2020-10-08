@@ -69,16 +69,6 @@ void VisualFeedback::resizeTexture(int width, int height)
 	}
 }
 
-void VisualFeedback::randomizeTexture(unsigned char *pixelsPtr)
-{
-	for (int i = 0; i < texWidth_ * texHeight_; i++)
-	{
-		pixelsPtr[i * 3 + 0] = rng_.fastInteger(0, 255);
-		pixelsPtr[i * 3 + 1] = rng_.fastInteger(0, 255) * (config_.textureUploadMode - 1);
-		pixelsPtr[i * 3 + 2] = rng_.fastInteger(0, 255) * config_.textureUploadMode;
-	}
-}
-
 void VisualFeedback::progressiveUpdate()
 {
 	FATAL_ASSERT(config_.textureUploadMode >= 0);
@@ -92,9 +82,6 @@ void VisualFeedback::progressiveUpdate()
 		FATAL_ASSERT(mapPtr_ == nullptr);
 		mapPtr_ = static_cast<GLubyte *>(pbo_->mapBufferRange(0, texSizeInBytes_, GL_MAP_WRITE_BIT | GL_MAP_INVALIDATE_BUFFER_BIT | GL_MAP_FLUSH_EXPLICIT_BIT));
 	}
-
-	//unsigned char *pixelsPtr = mapPtr_ ? mapPtr_ : pixels_.get();
-	//randomizeTexture(pixelsPtr);
 
 	texProgram_->use();
 	texture_->bind();

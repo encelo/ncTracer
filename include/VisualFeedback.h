@@ -2,7 +2,6 @@
 #define CLASS_VISUALFEEDBACK
 
 #include <nctl/UniquePtr.h>
-#include <ncine/Random.h>
 #include <ncine/TimeStamp.h>
 
 namespace ncine {
@@ -72,7 +71,6 @@ class VisualFeedback
 	unsigned char uniformsBuffer_[UniformsBufferSize];
 
 	nctl::UniquePtr<unsigned char[]> pixels_;
-	nc::Random rng_; // TEMP
 
 	nctl::UniquePtr<nc::GLShaderProgram> texProgram_;
 	nctl::UniquePtr<nc::GLShaderUniforms> texUniforms_;

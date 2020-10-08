@@ -23,6 +23,7 @@ class UserInterface
 	UserInterface(VisualFeedback &vf, SceneContext &sc);
 
 	void createGuiMainWindow();
+	void cameraInteraction();
 
   private:
 	static const unsigned int MaxStringLength = 256;
@@ -36,6 +37,8 @@ class UserInterface
 	bool createLightGuiTree(pm::Light *light);
 	bool createObjectGuiTree(pm::Geometry *object);
 	bool createMaterialGuiTree(pm::Material *material);
+
+	void onCameraChanged();
 };
 
 #endif

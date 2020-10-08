@@ -12,9 +12,9 @@ const unsigned int imageHeight = 720;
 
 }
 
-nc::IAppEventHandler *createAppEventHandler()
+nctl::UniquePtr<nc::IAppEventHandler> createAppEventHandler()
 {
-	return new MyEventHandler;
+	return nctl::makeUnique<MyEventHandler>();
 }
 
 void MyEventHandler::onPreInit(nc::AppConfiguration &config)
@@ -35,7 +35,7 @@ void MyEventHandler::onPreInit(nc::AppConfiguration &config)
 	config.withDebugOverlay = false;
 	config.withThreads = false;
 	config.isResizable = true;
-	config.vaoPoolSize = 2;
+	config.vaoPoolSize = 1;
 
 	config.windowTitle = "ncTracer";
 	config.windowIconFilename = "icon48.png";
@@ -68,6 +68,7 @@ void MyEventHandler::onFrameStart()
 
 	vf_->update();
 	ui_->createGuiMainWindow();
+	ui_->cameraInteraction();
 }
 
 void MyEventHandler::onKeyReleased(const nc::KeyboardEvent &event)

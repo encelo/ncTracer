@@ -33,6 +33,13 @@ class SceneContext
 
 		pm::Tracer::Type tracerType = pm::Tracer::Type::PATHTRACE;
 		pm::Camera *camera = nullptr;
+
+		struct CameraInteraction
+		{
+			bool enabled = false;
+			float keyboardSpeed = 2.0f;
+			float mouseSpeed = 0.5f;
+		} camInteraction;
 	};
 
 	SceneContext()
@@ -69,10 +76,6 @@ class SceneContext
 	pm::World world_;
 	unsigned int frameNumPixels_;
 	nctl::UniquePtr<pm::RGBColor[]> frame_;
-
-	void setupWorld(pm::World &world);
-	void setupCornellBox(pm::World &world);
-	void validateWorld(const pm::World &world);
 };
 
 #endif

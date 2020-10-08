@@ -30,6 +30,54 @@
 
 namespace {
 
+bool windowHovered = false;
+
+class CameraState
+{
+  public:
+	CameraState()
+	    : exposureTime(1.0f), viewDistance(1.0f), zoom(1.0f) {}
+
+	void loadTo(pm::Camera &camera) const
+	{
+		camera.editEye() = eye;
+		camera.editLookAt() = lookAt;
+		camera.editUp() = up;
+		camera.editExposureTime() = exposureTime;
+
+		if (camera.type() == pm::Camera::Type::PINHOLE)
+		{
+			pm::PinHole &pinhole = static_cast<pm::PinHole &>(camera);
+			pinhole.editViewDistance() = viewDistance;
+			pinhole.editZoom() = zoom;
+		}
+	}
+
+	void saveFrom(const pm::Camera &camera)
+	{
+		eye = camera.eye();
+		lookAt = camera.lookAt();
+		up = camera.up();
+		exposureTime = camera.exposureTime();
+
+		if (camera.type() == pm::Camera::Type::PINHOLE)
+		{
+			const pm::PinHole &pinhole = static_cast<const pm::PinHole &>(camera);
+			viewDistance = pinhole.viewDistance();
+			zoom = pinhole.zoom();
+		}
+	}
+
+  private:
+	pm::Vector3 eye;
+	pm::Vector3 lookAt;
+	pm::Vector3 up;
+
+	float exposureTime;
+	float viewDistance;
+	float zoom;
+} cameraState;
+
 int inputTextCallback(ImGuiInputTextCallbackData *data)
 {
 	nctl::String *string = reinterpret_cast<nctl::String *>(data->UserData);
@@ -111,6 +159,8 @@ UserInterface::UserInterface(VisualFeedback &vf, SceneContext &sc)
 #ifdef __ANDROID__
 	io.FontGlobalScale = 2.0f;
 #endif
+
+	cameraState.saveFrom(*sc_.config().camera);
 }
 
 ///////////////////////////////////////////////////////////
@@ -123,6 +173,7 @@ void UserInterface::createGuiMainWindow()
 	VisualFeedback::Configuration &vfConf = vf_.config();
 
 	ImGui::Begin("pmTracer");
+	windowHovered = ImGui::IsItemHovered();
 
 	if (ImGui::CollapsingHeader("Texture"))
 	{
@@ -137,7 +188,6 @@ void UserInterface::createGuiMainWindow()
 	{
 		ImGui::SliderInt("Tile Size", &scConf.tileSize, 4, 256);
 		ImGui::SliderInt("Num Threads", &scConf.numThreads, 1, scConf.maxThreads);
-		//ImGui::SliderInt("Max Depth", &scConf.maxDepth, 1, 5);
 
 		const char *tracerItems[] = { "RayCast", "Whitted", "AreaLighting", "PathTrace", "GlobalTrace" };
 		static int currentTracer = static_cast<int>(scConf.tracerType);
@@ -169,7 +219,9 @@ void UserInterface::createGuiMainWindow()
 		static float gamma = viewPlane.gamma();
 		ImGui::SliderFloat("Gamma", &gamma, 1.9f, 2.5f);
 		viewPlane.setGamma(gamma);
-		ImGui::SliderInt("Max Depth", &viewPlane.editMaxDepth(), 1, 5);
+		const pm::Tracer::Type tracerType = sc_.config().tracerType;
+		if (tracerType != pm::Tracer::Type::RAYCAST && tracerType != pm::Tracer::Type::AREALIGHTING)
+			ImGui::SliderInt("Max Depth", &viewPlane.editMaxDepth(), 1, 5);
 
 		const pm::Sampler::Type samplerType = viewPlane.sampler()->type();
 		auxString_.format("%s Sampler", samplerTypeToString(samplerType));
@@ -193,6 +245,22 @@ void UserInterface::createGuiMainWindow()
 			ImGui::InputFloat("View Distance", &pinhole->editViewDistance());
 			ImGui::InputFloat("Zoom", &pinhole->editZoom());
 		}
+
+		ImGui::NewLine();
+		if (ImGui::Button("Quick Load##Camera"))
+		{
+			cameraState.loadTo(*scConf.camera);
+			onCameraChanged();
+		}
+		ImGui::SameLine();
+		if (ImGui::Button("Quick Save##Camera"))
+			cameraState.saveFrom(*scConf.camera);
+
+		ImGui::NewLine();
+		ImGui::Checkbox("Input Interactions", &scConf.camInteraction.enabled);
+		ImGui::SliderFloat("Keyboard Speed", &scConf.camInteraction.keyboardSpeed, 0.5f, 20.0f);
+		ImGui::SliderFloat("Mouse Speed", &scConf.camInteraction.mouseSpeed, 0.125f, 5.0f);
+
 		scConf.camera->computeUvw();
 	}
 
@@ -410,6 +478,57 @@ void UserInterface::createGuiMainWindow()
 	ImGui::End();
 }
 
+void UserInterface::cameraInteraction()
+{
+	const SceneContext::Configuration::CameraInteraction interaction = sc_.config().camInteraction;
+	if (windowHovered || interaction.enabled == false)
+		return;
+
+	const float deltaTime = ImGui::GetIO().DeltaTime;
+	pm::Camera *camera = sc_.config().camera;
+
+	const pm::Vector3 forward = (camera->lookAt() - camera->eye()).normalized();
+	const pm::Vector3 right = cross(camera->up(), forward);
+	bool cameraChanged = false;
+
+	if (ImGui::IsKeyDown(ImGui::GetKeyIndex(ImGuiKey_UpArrow)))
+	{
+		camera->editEye() += forward * interaction.keyboardSpeed * deltaTime;
+		camera->editLookAt() += forward * interaction.keyboardSpeed * deltaTime;
+		cameraChanged = true;
+	}
+	if (ImGui::IsKeyDown(ImGui::GetKeyIndex(ImGuiKey_DownArrow)))
+	{
+		camera->editEye() -= forward * interaction.keyboardSpeed * deltaTime;
+		camera->editLookAt() -= forward * interaction.keyboardSpeed * deltaTime;
+		cameraChanged = true;
+	}
+	if (ImGui::IsKeyDown(ImGui::GetKeyIndex(ImGuiKey_RightArrow)))
+	{
+		camera->editEye() += right * interaction.keyboardSpeed * deltaTime;
+		camera->editLookAt() += right * interaction.keyboardSpeed * deltaTime;
+		cameraChanged = true;
+	}
+	if (ImGui::IsKeyDown(ImGui::GetKeyIndex(ImGuiKey_LeftArrow)))
+	{
+		camera->editEye() -= right * interaction.keyboardSpeed * deltaTime;
+		camera->editLookAt() -= right * interaction.keyboardSpeed * deltaTime;
+		cameraChanged = true;
+	}
+
+	if (ImGui::IsMouseDragging(ImGuiMouseButton_Left))
+	{
+		const ImVec2 mouseDelta = ImGui::GetMouseDragDelta(ImGuiMouseButton_Left);
+		ImGui::ResetMouseDragDelta();
+		camera->editLookAt().x += mouseDelta.x * interaction.mouseSpeed * deltaTime;
+		camera->editLookAt().y += mouseDelta.y * interaction.mouseSpeed * deltaTime;
+		cameraChanged = true;
+	}
+
+	if (cameraChanged)
+		onCameraChanged();
+}
+
 ///////////////////////////////////////////////////////////
 // PRIVATE FUNCTIONS
 ///////////////////////////////////////////////////////////
@@ -595,26 +714,35 @@ bool UserInterface::createMaterialGuiTree(pm::Material *material)
 				pm::Phong *phong = static_cast<pm::Phong *>(material);
 				ImGui::InputFloat("Ambient Kd", &phong->ambient().editKd());
 				ImGui::ColorEdit3("Ambient Cd", phong->ambient().editCd().data());
-				const pm::Sampler::Type ambientSamplerType = phong->ambient().sampler()->type();
-				auxString_.format("%s Sampler", samplerTypeToString(ambientSamplerType));
-				createSamplerGuiTree(phong->ambient().sampler());
+				if (phong->ambient().sampler())
+				{
+					const pm::Sampler::Type ambientSamplerType = phong->ambient().sampler()->type();
+					auxString_.format("%s Sampler", samplerTypeToString(ambientSamplerType));
+					createSamplerGuiTree(phong->ambient().sampler());
+				}
 				ImGui::PopID();
 
 				ImGui::PushID("Diffuse");
 				ImGui::InputFloat("Diffuse Kd", &phong->diffuse().editKd());
 				ImGui::ColorEdit3("Diffuse Cd", phong->diffuse().editCd().data());
-				const pm::Sampler::Type diffuseSamplerType = phong->diffuse().sampler()->type();
-				auxString_.format("%s Sampler", samplerTypeToString(diffuseSamplerType));
-				createSamplerGuiTree(phong->diffuse().sampler());
+				if (phong->diffuse().sampler())
+				{
+					const pm::Sampler::Type diffuseSamplerType = phong->diffuse().sampler()->type();
+					auxString_.format("%s Sampler", samplerTypeToString(diffuseSamplerType));
+					createSamplerGuiTree(phong->diffuse().sampler());
+				}
 				ImGui::PopID();
 
 				ImGui::PushID("Specular");
 				ImGui::InputFloat("Specular Ks", &phong->specular().editKs());
 				ImGui::ColorEdit3("Specular Cs", phong->specular().editCs().data());
 				ImGui::InputFloat("Specular Exp", &phong->specular().editExp());
-				const pm::Sampler::Type specularSamplerType = phong->specular().sampler()->type();
-				auxString_.format("%s Sampler", samplerTypeToString(specularSamplerType));
-				createSamplerGuiTree(phong->specular().sampler());
+				if (phong->specular().sampler())
+				{
+					const pm::Sampler::Type specularSamplerType = phong->specular().sampler()->type();
+					auxString_.format("%s Sampler", samplerTypeToString(specularSamplerType));
+					createSamplerGuiTree(phong->specular().sampler());
+				}
 				ImGui::PopID();
 				break;
 			}
@@ -631,4 +759,12 @@ bool UserInterface::createMaterialGuiTree(pm::Material *material)
 	}
 
 	return false;
+}
+
+void UserInterface::onCameraChanged()
+{
+	sc_.config().camera->computeUvw();
+	sc_.stopTracing();
+	sc_.reset();
+	sc_.startTracing();
 }
