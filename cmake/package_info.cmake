@@ -61,4 +61,9 @@ endfunction()
 
 function(callback_after_target)
 	target_compile_features(${PACKAGE_EXE_NAME} PUBLIC cxx_std_14)
+
+	if(MSVC)
+		target_compile_definitions(${PACKAGE_EXE_NAME} PRIVATE "WITH_GLEW")
+		target_include_directories(${PACKAGE_EXE_NAME} PRIVATE ${EXTERNAL_MSVC_DIR}/include)
+	endif()
 endfunction()

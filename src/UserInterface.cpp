@@ -172,7 +172,7 @@ void UserInterface::createGuiMainWindow()
 	SceneContext::Configuration &scConf = sc_.config();
 	VisualFeedback::Configuration &vfConf = vf_.config();
 
-	ImGui::Begin("pmTracer");
+	ImGui::Begin("ncTracer");
 	windowHovered = ImGui::IsItemHovered();
 
 	if (ImGui::CollapsingHeader("Texture"))

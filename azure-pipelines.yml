@@ -2,7 +2,7 @@ variables:
   package_name: ncTracer
   libraries_branch: libraries-OS-COMPILER
   ncine_branch: nCine-BRANCHNAME-OS-COMPILER
-  ncine_source_branch: $(Build.SourceBranchName)
+  ncine_source_branch: develop
   deploy_message:
     "Push artifact from Azure Pipelines build $(Build.BuildNumber) with id $(Build.BuildId)
 
@@ -69,6 +69,13 @@ jobs:
 
   steps:
   - script: |
+      sudo apt-get update
+      sudo apt-get install -y libgl1-mesa-dev
+
+    displayName: 'Install nCine Build Dependencies on Linux'
+    condition: eq( variables['Agent.OS'], 'Linux' )
+
+  - script: |
       curl -fsSL https://cmake.org/files/v3.16/cmake-3.16.9-Linux-x86_64.sh -o cmakeinstall.sh && \
       chmod +x cmakeinstall.sh && \
       sudo ./cmakeinstall.sh --prefix=/usr/local --exclude-subdir && \
@@ -100,47 +107,52 @@ jobs:
       git checkout $LIBRARIES_BRANCH
       LIBRARIES_FILE=$(ls -t | head -n 1) && tar xpzf $LIBRARIES_FILE
       mv nCine-external ..
-
       cd ..
       rm -rf nCine-libraries-artifacts
 
-      export NCINE_BRANCH=`echo $NCINE_BRANCH | sed 's/BRANCHNAME/'"$NCINE_SOURCE_BRANCH"'/'`
-      export NCINE_BRANCH=`echo $NCINE_BRANCH | sed 's/OS/'"$OS"'/'`
-      export NCINE_BRANCH=`echo $NCINE_BRANCH | sed 's/COMPILER/'"$CC"'/'`
-      git clone https://github.com/nCine/nCine-artifacts.git
-      cd nCine-artifacts
-      git checkout $NCINE_BRANCH
+      git clone https://github.com/encelo/pmTracer.git
+      # ncTracer-data repository is not part of the nCine organization
+      git clone https://github.com/encelo/$(package_name)-data.git
 
-      if [ "$(Agent.OS)" == "Linux" ]; then
-        NCINE_FILE=$(ls -t | head -n 1)
-        tar xpzf $NCINE_FILE
-        mv "${NCINE_FILE/.tar.gz/}" ../nCine
-      elif [ "$(Agent.OS)" == "Darwin" ]; then
-        NCINE_FILE=$(ls -t | head -n 1)
-        hdiutil convert *.dmg -format UDTO -o nCine
-        hdiutil attach -readonly nCine.cdr
-        cp -Rp /Volumes/nCine-*-Darwin/nCine.app ..
-        hdiutil detach /Volumes/nCine-*-Darwin;
-      fi
-
-      cd ..
-      rm -rf nCine-artifacts
-
-      git clone https://github.com/nCine/$(package_name)-data.git
-
-    displayName: 'Download nCine-libraries and nCine Artifacts and $(package_name)-data'
+    displayName: 'Download nCine-libraries, pmTracer and $(package_name)-data'
 
   - script: |
+      cd ..
+      git clone https://github.com/nCine/nCine-data.git
+      git clone https://github.com/nCine/nCine.git --branch $NCINE_SOURCE_BRANCH
+
+    displayName: 'Download nCine source and data'
+
+  - script: |
+      cd ../nCine
+      if [[ "$(BuildType)" == "BinDist" ]]; then
+        export NCINE_BUILD_TYPE=Release
+      else
+        export NCINE_BUILD_TYPE=$(BuildType)
+      fi
+      export CMAKE_ARGS="-B ../nCine-build-$NCINE_BUILD_TYPE -D CMAKE_BUILD_TYPE=$NCINE_BUILD_TYPE -D NCINE_DYNAMIC_LIBRARY=OFF -D NCINE_PREFERRED_BACKEND=SDL2 -D NCINE_WITH_WEBP=OFF -D NCINE_WITH_AUDIO=OFF -D NCINE_BUILD_TESTS=OFF"
+
       if [ "$(Agent.OS)" == "Linux" ]; then
-        export NCINE_DIRECTORY=$(pwd)/../nCine/lib/cmake/nCine
-      elif [ "$(Agent.OS)" == "Darwin" ]; then
-         export NCINE_DIRECTORY=$(pwd)/../nCine.app/Contents/Resources/cmake
+        export CMAKE_ARGS="$CMAKE_ARGS -D CMAKE_PREFIX_PATH=$(pwd)/../nCine-external"
+      fi
+
+      cmake $CMAKE_ARGS
+      cd ..
+      make -j2 -C nCine-build-$NCINE_BUILD_TYPE
+
+    displayName: 'CMake Configuration and Make of nCine as a static library'
+
+  - script: |
+      export CMAKE_ARGS="-B ../$(package_name)-build-$(BuildType) -D PMTRACER_ROOT=$(pwd)/../pmTracer"
+
+      if [ "$(Agent.OS)" == "Linux" ]; then
+        export CMAKE_ARGS="$CMAKE_ARGS -D CMAKE_PREFIX_PATH=$(pwd)/../nCine-external"
       fi
 
       if [[ "$(BuildType)" == "BinDist" ]]; then
-        cmake -B ../$(package_name)-build-$(BuildType) -D PACKAGE_OPTIONS_PRESETS=$(BuildType) -D nCine_DIR=$NCINE_DIRECTORY
+        cmake $CMAKE_ARGS -D PACKAGE_OPTIONS_PRESETS=$(BuildType) -D nCine_DIR=$(pwd)/../nCine-build-Release
       else
-        cmake -B ../$(package_name)-build-$(BuildType) -D CMAKE_BUILD_TYPE=$(BuildType) -D nCine_DIR=$NCINE_DIRECTORY
+        cmake $CMAKE_ARGS -D CMAKE_BUILD_TYPE=$(BuildType) -D nCine_DIR=$(pwd)/../nCine-build-$(BuildType)
       fi
 
     displayName: 'CMake Configuration'
@@ -177,7 +189,8 @@ jobs:
       export DEPLOY_BRANCH=`echo $DEPLOY_BRANCH | sed 's/BRANCHNAME/'"$(Build.SourceBranchName)"'/'`
       export DEPLOY_BRANCH=`echo $DEPLOY_BRANCH | sed 's/OS/'"$OS"'/'`
       export DEPLOY_BRANCH=`echo $DEPLOY_BRANCH | sed 's/COMPILER/'"$CC"'/'`
-      git clone https://$MAPPED_GH_TOKEN@github.com/nCine/$(package_name)-artifacts.git >/dev/null 2>&1
+      # ncTracer-artifacts repository is not part of the nCine organization
+      git clone https://$MAPPED_GH_TOKEN@github.com/encelo/$(package_name)-artifacts.git >/dev/null 2>&1
       cd $(package_name)-artifacts
 
       git checkout $DEPLOY_BRANCH || git checkout --orphan $DEPLOY_BRANCH
@@ -245,6 +258,12 @@ jobs:
 
   steps:
   - script: |
+      sudo apt-get update
+      sudo apt-get install -y libgl1-mesa-dev
+
+    displayName: 'Install nCine Build Dependencies'
+
+  - script: |
       curl -sL https://cmake.org/files/v3.16/cmake-3.16.9-Linux-x86_64.sh -o cmakeinstall.sh \
       && chmod +x cmakeinstall.sh \
       && sudo ./cmakeinstall.sh --prefix=/usr/local --exclude-subdir \
@@ -269,27 +288,28 @@ jobs:
       git checkout $LIBRARIES_BRANCH
       LIBRARIES_FILE=$(ls -t | head -n 1) && tar xpzf $LIBRARIES_FILE
       mv nCine-external ..
-
+      git checkout android-libraries-armeabi-v7a
+      LIBRARIES_FILE=$(ls -t | head -n 1) && tar xpzf $LIBRARIES_FILE
+      git checkout android-libraries-arm64-v8a
+      LIBRARIES_FILE=$(ls -t | head -n 1) && tar xpzf $LIBRARIES_FILE
+      git checkout android-libraries-x86_64
+      LIBRARIES_FILE=$(ls -t | head -n 1) && tar xpzf $LIBRARIES_FILE
+      mv nCine-android-external ..
       cd ..
       rm -rf nCine-libraries-artifacts
 
-      export NCINE_BRANCH=`echo $NCINE_BRANCH | sed 's/BRANCHNAME/'"$NCINE_SOURCE_BRANCH"'/'`
-      export NCINE_BRANCH=`echo $NCINE_BRANCH | sed 's/OS/'"$OS"'/'`
-      export NCINE_BRANCH=`echo $NCINE_BRANCH | sed 's/COMPILER/'"$CC"'/'`
-      git clone https://github.com/nCine/nCine-artifacts.git
-      cd nCine-artifacts
-      git checkout $NCINE_BRANCH
+      git clone https://github.com/encelo/pmTracer.git
+      # ncTracer-data repository is not part of the nCine organization
+      git clone https://github.com/encelo/$(package_name)-data.git
 
-      NCINE_FILE=$(ls -t | head -n 1)
-      tar xpzf $NCINE_FILE
-      mv "${NCINE_FILE/.tar.gz/}" ../nCine
+    displayName: 'Download nCine-libraries, pmTracer and $(package_name)-data'
 
+  - script: |
       cd ..
-      rm -rf nCine-artifacts
+      git clone https://github.com/nCine/nCine-data.git
+      git clone https://github.com/nCine/nCine.git --branch $NCINE_SOURCE_BRANCH
 
-      git clone https://github.com/nCine/$(package_name)-data.git
-
-    displayName: 'Download nCine-libraries and nCine Artifacts and $(package_name)-data'
+    displayName: 'Download nCine source and data'
 
   - script: |
       export NDK_URL=https://dl.google.com/android/repository/android-ndk-$NDK_VERSION-linux-x86_64.zip
@@ -303,7 +323,19 @@ jobs:
   - script: |
       export ANDROID_NDK_HOME=$(pwd)/../android-ndk-$NDK_VERSION
 
-      cmake -B ../$(package_name)-build-$(BuildType) -D CMAKE_BUILD_TYPE=$(BuildType) -D PACKAGE_NDK_ARCHITECTURES=$(Arch) -D PACKAGE_BUILD_ANDROID=ON -D PACKAGE_ASSEMBLE_APK=ON -D nCine_DIR=$(pwd)/../nCine/lib/cmake/nCine
+      cd ../nCine
+      export CMAKE_ARGS=" -B ../nCine-build-$(BuildType) -D CMAKE_BUILD_TYPE=$(BuildType) -D NCINE_DYNAMIC_LIBRARY=OFF -D NCINE_WITH_WEBP=OFF -D NCINE_WITH_AUDIO=OFF -D NCINE_BUILD_TESTS=OFF -D NCINE_BUILD_ANDROID=ON -D NCINE_NDK_ARCHITECTURES=$(Arch) -D CMAKE_PREFIX_PATH=$(pwd)/../nCine-external"
+
+      cmake $CMAKE_ARGS
+      cd ..
+      make -j2 -C nCine-build-$(BuildType)
+
+    displayName: 'CMake Configuration and Make of nCine as a static library'
+
+  - script: |
+      export ANDROID_NDK_HOME=$(pwd)/../android-ndk-$NDK_VERSION
+
+      cmake -B ../$(package_name)-build-$(BuildType) -D CMAKE_BUILD_TYPE=$(BuildType) -D PACKAGE_NDK_ARCHITECTURES=$(Arch) -D PACKAGE_BUILD_ANDROID=ON -D PACKAGE_ASSEMBLE_APK=ON -D nCine_DIR=$(pwd)/../nCine-build-$(BuildType) -D CMAKE_PREFIX_PATH=$(pwd)/../nCine-external -D PMTRACER_ROOT=$(pwd)/../pmTracer
 
     displayName: 'CMake Configuration'
 
@@ -319,7 +351,8 @@ jobs:
 
       cd ..
       export DEPLOY_BRANCH=$(package_name)-$(Build.SourceBranchName)-android-$(Arch)-$(BuildType)
-      git clone https://$MAPPED_GH_TOKEN@github.com/nCine/$(package_name)-artifacts.git >/dev/null 2>&1
+      # ncTracer-artifacts repository is not part of the nCine organization
+      git clone https://$MAPPED_GH_TOKEN@github.com/encelo/$(package_name)-artifacts.git >/dev/null 2>&1
       cd $(package_name)-artifacts
 
       git checkout $DEPLOY_BRANCH || git checkout --orphan $DEPLOY_BRANCH
@@ -402,39 +435,49 @@ jobs:
       cd ..
       rm -rf nCine-libraries-artifacts
 
-      export NCINE_BRANCH=`echo $NCINE_BRANCH | sed 's/BRANCHNAME/'"$NCINE_SOURCE_BRANCH"'/'`
-      export NCINE_BRANCH=`echo $NCINE_BRANCH | sed 's/OS/'"$OS"'/'`
-      export NCINE_BRANCH=`echo $NCINE_BRANCH | sed 's/COMPILER/'"$CC"'/'`
-      git clone https://github.com/nCine/nCine-artifacts.git
-      cd nCine-artifacts
-      git checkout $NCINE_BRANCH
+      git clone https://github.com/encelo/pmTracer.git
+      # ncTracer-data repository is not part of the nCine organization
+      git clone https://github.com/encelo/$(package_name)-data.git
 
-      NCINE_FILE=$(ls -t | head -n 1)
-      tar xpzf $NCINE_FILE
-      mv nCine-*-Emscripten ../nCine
+    displayName: 'Download nCine-libraries, pmTracer and $(package_name)-data'
 
+  - script: |
       cd ..
-      rm -rf nCine-artifacts
+      git clone https://github.com/nCine/nCine-data.git
+      git clone https://github.com/nCine/nCine.git --branch $NCINE_SOURCE_BRANCH
 
-      git clone https://github.com/nCine/$(package_name)-data.git
-
-    displayName: 'Download nCine-libraries and nCine Artifacts and $(package_name)-data'
+    displayName: 'Download nCine source and data'
 
   - script: |
       source ../emsdk/emsdk_env.sh
-      export NCINE_DIRECTORY=$(pwd)/../nCine/cmake
+
+      cd ../nCine
+      if [[ "$(BuildType)" == "BinDist" ]]; then
+        export NCINE_BUILD_TYPE=Release
+      else
+        export NCINE_BUILD_TYPE=$(BuildType)
+      fi
+      export CMAKE_ARGS="-B ../nCine-build-$NCINE_BUILD_TYPE -D CMAKE_BUILD_TYPE=$NCINE_BUILD_TYPE -D NCINE_PREFERRED_BACKEND=SDL2 -D NCINE_WITH_THREADS=ON -D NCINE_WITH_WEBP=OFF -D NCINE_WITH_AUDIO=OFF -D NCINE_BUILD_TESTS=OFF"
+
+      emcmake cmake $CMAKE_ARGS
+      cd ..
+      make -j2 -C nCine-build-$NCINE_BUILD_TYPE
+
+    displayName: 'CMake Configuration and Make of nCine as a static library'
+
+  - script: |
+      source ../emsdk/emsdk_env.sh
+      export CMAKE_ARGS="-B ../$(package_name)-build-$(BuildType) -D PMTRACER_ROOT=$(pwd)/../pmTracer"
 
       if [[ "$(BuildType)" == "BinDist" ]]; then
-        emcmake cmake -B ../$(package_name)-build-$(BuildType) -D PACKAGE_OPTIONS_PRESETS=$(BuildType) -D nCine_DIR=$NCINE_DIRECTORY
+        emcmake cmake $CMAKE_ARGS -D PACKAGE_OPTIONS_PRESETS=$(BuildType) -D nCine_DIR=$(pwd)/../nCine-build-Release
       else
-        emcmake cmake -B ../$(package_name)-build-$(BuildType) -D CMAKE_BUILD_TYPE=$(BuildType) -D nCine_DIR=$NCINE_DIRECTORY
+        emcmake cmake $CMAKE_ARGS -D CMAKE_BUILD_TYPE=$(BuildType) -D nCine_DIR=$(pwd)/../nCine-build-$(BuildType)
       fi
 
     displayName: 'CMake Configuration'
 
   - script: |
-      source ../emsdk/emsdk_env.sh
-
       make -j2 -C ../$(package_name)-build-$(BuildType)
 
     displayName: 'Make'
@@ -453,7 +496,8 @@ jobs:
       export DEPLOY_BRANCH=`echo $DEPLOY_BRANCH | sed 's/BRANCHNAME/'"$(Build.SourceBranchName)"'/'`
       export DEPLOY_BRANCH=`echo $DEPLOY_BRANCH | sed 's/OS/'"$OS"'/'`
       export DEPLOY_BRANCH=`echo $DEPLOY_BRANCH | sed 's/COMPILER/'"$CC"'/'`
-      git clone https://$MAPPED_GH_TOKEN@github.com/nCine/$(package_name)-artifacts.git >/dev/null 2>&1
+      # ncTracer-artifacts repository is not part of the nCine organization
+      git clone https://$MAPPED_GH_TOKEN@github.com/encelo/$(package_name)-artifacts.git >/dev/null 2>&1
       cd $(package_name)-artifacts
 
       git checkout $DEPLOY_BRANCH || git checkout --orphan $DEPLOY_BRANCH
@@ -558,7 +602,7 @@ jobs:
     condition: eq( variables['Compiler'], 'mingw64' )
 
   - powershell: |
-      C:\msys64\usr\bin\pacman --noconfirm -S mingw-w64-x86_64-glew mingw-w64-x86_64-glfw mingw-w64-x86_64-SDL2 mingw-w64-x86_64-openal mingw-w64-x86_64-libvorbis mingw-w64-x86_64-libwebp mingw-w64-x86_64-lua mingw-w64-x86_64-cmake make
+      C:\msys64\usr\bin\pacman --noconfirm -S mingw-w64-x86_64-glew mingw-w64-x86_64-glfw mingw-w64-x86_64-SDL2 mingw-w64-x86_64-openal mingw-w64-x86_64-libvorbis mingw-w64-x86_64-libwebp mingw-w64-x86_64-lua cmake
 
       if ($env:CC -eq "gcc") { C:\msys64\usr\bin\pacman --noconfirm -S mingw-w64-x86_64-gcc }
       else { C:\msys64\usr\bin\pacman --noconfirm -S mingw-w64-x86_64-clang }
@@ -600,36 +644,60 @@ jobs:
       cd ..
       Remove-Item nCine-libraries-artifacts -Recurse -Force
 
-      git clone https://github.com/nCine/nCine-artifacts.git
-      cd nCine-artifacts
+      git clone https://github.com/encelo/pmTracer.git
+      # ncTracer-data repository is not part of the nCine organization
+      git clone https://github.com/encelo/$(package_name)-data.git
 
-      if ($env:Compiler -ne "mingw64")
+    displayName: 'Download nCine-libraries, pmTracer and $(package_name)-data'
+
+  - script: |
+      cd ..
+      git clone https://github.com/nCine/nCine-data.git
+      git clone https://github.com/nCine/nCine.git --branch $(ncine_source_branch)
+
+    displayName: 'Download nCine source and data'
+
+  - powershell: |
+      $env:generator = switch ("$(imageName)")
       {
-        $env:NCINE_BRANCH = $env:NCINE_BRANCH -replace "BRANCHNAME","$env:NCINE_SOURCE_BRANCH" -replace "OS","windows" -replace "COMPILER",$env:vsversion
-        git checkout $env:NCINE_BRANCH
-        $env:NCINE_FILE = Get-ChildItem -Path $(pwd) -Filter *.zip -Name -File | Select-Object -First 1
-        7z x $env:NCINE_FILE
-        $env:NCINE_DIR = $env:NCINE_FILE -replace ".zip",""
+        "windows-2019" {"Visual Studio 16 2019"}
+        "vs2017-win2016" {"Visual Studio 15 2017"}
+      }
+
+      cd ../nCine
+      if ($env:BuildType -eq "BinDist")
+        { $nCineBuildType = "Release" }
+      else
+        { $nCineBuildType = $env:BuildType }
+
+      cmake -G "$env:generator" -A x64 -B ../nCine-build-$nCineBuildType -D CMAKE_BUILD_TYPE=$nCineBuildType -D NCINE_DYNAMIC_LIBRARY=OFF -D NCINE_PREFERRED_BACKEND=SDL2 -D NCINE_WITH_WEBP=OFF -D NCINE_WITH_AUDIO=OFF -D NCINE_BUILD_TESTS=OFF
+
+      cd ..
+      cmake --build nCine-build-$nCineBuildType --config $nCineBuildType
+
+    displayName: 'CMake Configuration and Make of nCine as a static library on Windows'
+    condition: ne( variables['Compiler'], 'mingw64' )
+
+  - powershell: |
+      $env:PATH = "C:\msys64\usr\bin;C:\Windows\system32;C:\Windows;C:\Windows\System32\Wbem"
+      $env:MSYSTEM = "MINGW64"
+
+      cd ../nCine
+      if ($env:BuildType -eq "BinDist")
+      {
+          C:\msys64\usr\bin\bash.exe -lc 'cmake -G \"MSYS Makefiles\" -B ../nCine-build-Release -D CMAKE_BUILD_TYPE=Release -D NCINE_DYNAMIC_LIBRARY=OFF -D NCINE_PREFERRED_BACKEND=SDL2 -D NCINE_WITH_WEBP=OFF -D NCINE_WITH_AUDIO=OFF -D NCINE_BUILD_TESTS=OFF'
+          C:\msys64\usr\bin\bash.exe -lc 'make -j2 -C ../nCine-build-Release'
       }
       else
       {
-        $env:NCINE_BRANCH = $env:NCINE_BRANCH -replace "BRANCHNAME","$env:NCINE_SOURCE_BRANCH" -replace "OS","mingw64" -replace "COMPILER",$env:CC
-        git checkout $env:NCINE_BRANCH
-        $env:NCINE_FILE = Get-ChildItem -Path $(pwd) -Name -File | Select-Object -First 1
-        7z x $env:NCINE_FILE
-        $env:NCINE_FILE = $env:NCINE_FILE -replace ".gz",""
-        7z x $env:NCINE_FILE -aos
-        $env:NCINE_DIR = $env:NCINE_FILE -replace ".tar",""
+          C:\msys64\usr\bin\bash.exe -lc 'cmake -G \"MSYS Makefiles\" -B ../nCine-build-$(BuildType) -D CMAKE_BUILD_TYPE=$(BuildType) -D NCINE_DYNAMIC_LIBRARY=OFF -D NCINE_PREFERRED_BACKEND=SDL2 -D NCINE_WITH_WEBP=OFF -D NCINE_WITH_AUDIO=OFF -D NCINE_BUILD_TESTS=OFF'
+          C:\msys64\usr\bin\bash.exe -lc 'make -j2 -C ../nCine-build-$(BuildType)'
       }
 
-      Move-Item -Path $env:NCINE_DIR -Destination ../nCine
-
-      cd ..
-      Remove-Item nCine-artifacts -Recurse -Force
-
-      git clone https://github.com/nCine/$(package_name)-data.git
-
-    displayName: 'Download nCine-libraries and nCine Artifacts and $(package_name)-data'
+    displayName: 'CMake Configuration and Make of nCine as a static library on MinGW'
+    condition: eq( variables['Compiler'], 'mingw64' )
+    env:
+      CHERE_INVOKING: on
 
   - powershell: |
       $env:generator = switch ("$(imageName)")
@@ -639,9 +707,9 @@ jobs:
       }
 
       if ($env:BuildType -eq "BinDist")
-        { cmake -G "$env:generator" -A x64 -B ../$(package_name)-build-$(BuildType) -D PACKAGE_OPTIONS_PRESETS=$(BuildType) -D nCine_DIR=$(pwd)/../nCine/cmake }
+        { cmake -G "$env:generator" -A x64 -B ../$(package_name)-build-$(BuildType) -D nCine_DIR=$(pwd)/../nCine-build-Release -D PMTRACER_ROOT=$(pwd)/../pmTracer }
       else
-        { cmake -G "$env:generator" -A x64 -B ../$(package_name)-build-$(BuildType) -D nCine_DIR=$(pwd)/../nCine/cmake }
+        { cmake -G "$env:generator" -A x64 -B ../$(package_name)-build-$(BuildType) -D nCine_DIR=$(pwd)/../nCine-build-$(BuildType) -D PMTRACER_ROOT=$(pwd)/../pmTracer }
 
     displayName: 'CMake Configuration on Windows'
     condition: ne( variables['Compiler'], 'mingw64' )
@@ -651,9 +719,9 @@ jobs:
       $env:MSYSTEM = "MINGW64"
 
       if ($env:BuildType -eq "BinDist")
-        { C:\msys64\usr\bin\bash.exe -lc 'cmake -G \"MSYS Makefiles\" -B ../$(package_name)-build-$(BuildType) -D PACKAGE_OPTIONS_PRESETS=$(BuildType) -D nCine_DIR=$(pwd)/../nCine/lib/cmake/nCine' }
+        { C:\msys64\usr\bin\bash.exe -lc 'cmake -G \"MSYS Makefiles\" -B ../$(package_name)-build-$(BuildType) -D nCine_DIR=$(pwd)/../nCine-build-Release -D PMTRACER_ROOT=$(pwd)/../pmTracer' }
       else
-        { C:\msys64\usr\bin\bash.exe -lc 'cmake -G \"MSYS Makefiles\" -B ../$(package_name)-build-$(BuildType) -D CMAKE_BUILD_TYPE=$(BuildType) -D nCine_DIR=$(pwd)/../nCine/lib/cmake/nCine' }
+        { C:\msys64\usr\bin\bash.exe -lc 'cmake -G \"MSYS Makefiles\" -B ../$(package_name)-build-$(BuildType) -D nCine_DIR=$(pwd)/../nCine-build-$(BuildType) -D PMTRACER_ROOT=$(pwd)/../pmTracer' }
 
     displayName: 'CMake Configuration on MinGW'
     condition: eq( variables['Compiler'], 'mingw64' )
@@ -713,7 +781,8 @@ jobs:
         { $env:DEPLOY_BRANCH = $env:DEPLOY_BRANCH -replace "OS","mingw64" -replace "COMPILER",$env:CC }
 
       cd ..
-      git clone https://$env:MAPPED_GH_TOKEN@github.com/nCine/$(package_name)-artifacts.git 2>&1>$null
+      # ncTracer-artifacts repository is not part of the nCine organization
+      git clone https://$env:MAPPED_GH_TOKEN@github.com/encelo/$(package_name)-artifacts.git 2>&1>$null
       cd $(package_name)-artifacts
       git checkout $env:DEPLOY_BRANCH; if (-not $?) { git checkout --orphan $env:DEPLOY_BRANCH }
       git reset
