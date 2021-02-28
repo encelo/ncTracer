@@ -2,13 +2,11 @@ name: 'Android'
 
 env:
   LIBRARIES_BRANCH: libraries-OS-COMPILER
-  NCINE_BRANCH: nCine-BRANCH_NAME-OS-COMPILER
   NCINE_SOURCE_BRANCH: BRANCH_NAME
   DEPLOY_MESSAGE:
     "Push artifact from GitHub Actions build ${{ github.run_number }} with id ${{ github.run_id }}
 
      - PACKAGE_NAME artifact from branch 'BRANCH_NAME' with commit id ${{ github.sha }}"
-  NDK_VERSION: r21d
 
 on: [push, workflow_dispatch]
 
@@ -72,18 +70,8 @@ jobs:
         git clone https://github.com/nCine/nCine-data.git
         git clone https://github.com/nCine/nCine.git --branch $NCINE_SOURCE_BRANCH
 
-    - name: 'Download Android NDK'
-      run: |
-        export NDK_URL=https://dl.google.com/android/repository/android-ndk-$NDK_VERSION-linux-x86_64.zip
-
-        cd ..
-        curl -fsSL $NDK_URL -o ndk.zip
-        unzip -q ndk.zip && rm -f ndk.zip
-
     - name: 'CMake Configuration and Make of nCine as a static library'
       run: |
-        export ANDROID_NDK_HOME=$(pwd)/../android-ndk-$NDK_VERSION
-
         cd ../nCine
         export CMAKE_ARGS=" -B ../nCine-build-${{ matrix.BuildType }} -D CMAKE_BUILD_TYPE=${{ matrix.BuildType }} -D NCINE_DYNAMIC_LIBRARY=OFF -D NCINE_WITH_WEBP=OFF -D NCINE_WITH_AUDIO=OFF -D NCINE_BUILD_TESTS=OFF -D NCINE_BUILD_ANDROID=ON -D NCINE_NDK_ARCHITECTURES=${{ matrix.ARCH }} -D CMAKE_PREFIX_PATH=$(pwd)/../nCine-external"
 
@@ -94,7 +82,6 @@ jobs:
     - name: 'CMake Configuration'
       run: |
         export PACKAGE_NAME=${GITHUB_REPOSITORY##*/}
-        export ANDROID_NDK_HOME=$(pwd)/../android-ndk-$NDK_VERSION
 
         cmake -B ../$PACKAGE_NAME-build-${{ matrix.BuildType }} -D CMAKE_BUILD_TYPE=${{ matrix.BuildType }} -D PACKAGE_NDK_ARCHITECTURES=${{ matrix.ARCH }} -D PACKAGE_BUILD_ANDROID=ON -D PACKAGE_ASSEMBLE_APK=ON -D nCine_DIR=$(pwd)/../nCine-build-${{ matrix.BuildType }} -D CMAKE_PREFIX_PATH=$(pwd)/../nCine-external -D PMTRACER_ROOT=$(pwd)/../pmTracer
 

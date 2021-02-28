@@ -2,14 +2,12 @@ name: 'Linux'
 
 env:
   LIBRARIES_BRANCH: libraries-OS-COMPILER
-  NCINE_BRANCH: nCine-BRANCH_NAME-OS-COMPILER
   NCINE_SOURCE_BRANCH: BRANCH_NAME
   DEPLOY_MESSAGE:
     "Push artifact from GitHub Actions build ${{ github.run_number }} with id ${{ github.run_id }}
 
      - PACKAGE_NAME artifact from branch 'BRANCH_NAME' with commit id ${{ github.sha }}"
   DEPLOY_BRANCH: PACKAGE_NAME-BRANCH_NAME-OS-COMPILER
-  NDK_VERSION: r21d
 
 on: [push, workflow_dispatch]
 

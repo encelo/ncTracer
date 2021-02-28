@@ -2,14 +2,12 @@ name: 'Windows'
 
 env:
   LIBRARIES_BRANCH: libraries-OS-COMPILER
-  NCINE_BRANCH: nCine-BRANCH_NAME-OS-COMPILER
   NCINE_SOURCE_BRANCH: BRANCH_NAME
   DEPLOY_MESSAGE:
     "Push artifact from GitHub Actions build ${{ github.run_number }} with id ${{ github.run_id }}
 
      - PACKAGE_NAME artifact from branch 'BRANCH_NAME' with commit id ${{ github.sha }}"
   DEPLOY_BRANCH: PACKAGE_NAME-BRANCH_NAME-OS-COMPILER
-  NDK_VERSION: r21d
 
 on: [push, workflow_dispatch]
 
@@ -68,7 +66,7 @@ jobs:
         git clone https://github.com/nCine/nCine-data.git
         git clone https://github.com/nCine/nCine.git --branch $env:NCINE_SOURCE_BRANCH
 
-    - name: CMake Configuration and Make of nCine as a static library'
+    - name: 'CMake Configuration and Make of nCine as a static library'
       run: |
         $env:generator = switch ("${{ matrix.os }}")
         {

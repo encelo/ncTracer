@@ -2,7 +2,6 @@ name: 'CodeQL'
 
 env:
   LIBRARIES_BRANCH: libraries-OS-COMPILER
-  NCINE_BRANCH: nCine-BRANCH_NAME-OS-COMPILER
   NCINE_SOURCE_BRANCH: BRANCH_NAME
 
 on: [push, workflow_dispatch]
@@ -70,7 +69,6 @@ jobs:
 
         # CMake Configuration and Make
         export PACKAGE_NAME=${GITHUB_REPOSITORY##*/}
-        export NCINE_DIRECTORY=$(pwd)/nCine/lib/cmake/nCine
 
         cd $PACKAGE_NAME
         cmake -B ../$PACKAGE_NAME-build-$BuildType -D PMTRACER_ROOT=$(pwd)/../pmTracer -D CMAKE_PREFIX_PATH=$(pwd)/../nCine-external -D CMAKE_BUILD_TYPE=$BuildType -D nCine_DIR=$(pwd)/../nCine-build-$BuildType
