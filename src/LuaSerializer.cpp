@@ -314,7 +314,7 @@ bool LuaSerializer::load(const char *filename, pm::World &world)
 	                        nc::LuaStateManager::StatisticsTracking::DISABLED,
 	                        nc::LuaStateManager::StandardLibraries::NOT_LOADED);
 
-	if (luaState.run(filename) == false)
+	if (luaState.runFromFile(filename) == false)
 		return false;
 	lua_State *L = luaState.state();
 
