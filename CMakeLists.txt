@@ -5,6 +5,8 @@ set(NCPROJECT_COPYRIGHT "Copyright ©2019-2021 ${NCPROJECT_VENDOR}")
 set(NCPROJECT_DESCRIPTION "pmTracer front-end")
 set(NCPROJECT_HOMEPAGE "https://ncine.github.io")
 set(NCPROJECT_REVERSE_DNS "io.github.ncine.nctracer")
+set(NCPROJECT_XDGDESKTOP_CATEGORIES "Education")
+set(NCPROJECT_MACOS_CATEGORY "public.app-category.education")
 
 set(NCPROJECT_INCLUDE_DIRS include)
 

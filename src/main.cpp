@@ -1,3 +1,14 @@
+#include <ncine/config.h>
+#if !NCINE_WITH_IMGUI
+	#error nCine must have ImGui integration enabled for this application to work
+#endif
+#if !NCINE_WITH_LUA
+	#error nCine must have Lua integration enabled for this application to work
+#endif
+#if !NCINE_WITH_THREADS
+	#error nCine must have threads integration enabled for this application to work
+#endif
+
 #include "main.h"
 #include "VisualFeedback.h"
 #include "UserInterface.h"
