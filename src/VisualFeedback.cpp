@@ -2,7 +2,6 @@
 #include <ncine/Matrix4x4.h>
 #include <ncine/GLShaderProgram.h>
 #include <ncine/GLShaderUniforms.h>
-#include <ncine/GLShaderAttributes.h>
 #include <ncine/GLTexture.h>
 #include <ncine/GLBufferObject.h>
 
@@ -24,7 +23,6 @@ VisualFeedback::VisualFeedback()
 	texUniforms_ = nctl::makeUnique<nc::GLShaderUniforms>(texProgram_.get());
 	texUniforms_->setUniformsDataPointer(uniformsBuffer_);
 	texUniforms_->uniform("uTexture")->setIntValue(0);
-	texAttributes_ = nctl::makeUnique<nc::GLShaderAttributes>(texProgram_.get());
 
 	FATAL_ASSERT(UniformsBufferSize >= texProgram_->uniformsSize());
 

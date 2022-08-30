@@ -8,7 +8,6 @@ namespace ncine {
 
 class GLShaderProgram;
 class GLShaderUniforms;
-class GLShaderAttributes;
 class GLTexture;
 class GLBufferObject;
 
@@ -74,7 +73,6 @@ class VisualFeedback
 
 	nctl::UniquePtr<nc::GLShaderProgram> texProgram_;
 	nctl::UniquePtr<nc::GLShaderUniforms> texUniforms_;
-	nctl::UniquePtr<nc::GLShaderAttributes> texAttributes_;
 	nctl::UniquePtr<nc::GLTexture> texture_;
 
 	nctl::UniquePtr<nc::GLBufferObject> pbo_;
