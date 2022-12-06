@@ -45,7 +45,7 @@ void MyEventHandler::onPreInit(nc::AppConfiguration &config)
 	config.withAudio = false;
 	config.withDebugOverlay = false;
 	config.withThreads = false;
-	config.isResizable = true;
+	config.resizable = true;
 	config.vaoPoolSize = 1;
 
 	config.windowTitle = "ncTracer";
