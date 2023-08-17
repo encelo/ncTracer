@@ -59,7 +59,7 @@ class SceneContext
 	inline bool isTracing() const { return threads_.threadsRunning(); }
 	inline float tracingProgress() const { return threads_.progress(); }
 	float tracingTime() const;
-	void savePbm(const char *filename);
+	void savePbm(const char *filename, bool binary);
 	void savePng(const char *filename);
 
 	inline const pm::World &world() const { return world_; }

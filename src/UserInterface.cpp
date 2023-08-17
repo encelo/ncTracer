@@ -469,7 +469,7 @@ void UserInterface::createGuiMainWindow()
 	if (!sc_.isTracing())
 	{
 		if (ImGui::Button("Save PBM"))
-			sc_.savePbm("image.pbm");
+			sc_.savePbm("image.pbm", true);
 		ImGui::SameLine();
 		if (ImGui::Button("Save PNG"))
 			sc_.savePng("image.png");
@@ -541,16 +541,18 @@ void UserInterface::createSamplerGuiTree(pm::Sampler *sampler)
 
 	if (ImGui::TreeNode(auxString_.data()))
 	{
-		static int numSamples = sampler->numSamples();
+		int numSamples = sampler->numSamples();
 		ImGui::PushItemWidth(100.0f);
-		ImGui::InputInt("Samples", &numSamples);
+		if (ImGui::InputInt("Samples", &numSamples))
+		{
+			if (numSamples < 1)
+				numSamples != sampler->numSamples();
+
+			if (numSamples > 0 && numSamples != sampler->numSamples())
+				sampler->resize(numSamples);
+		}
 		ImGui::PopItemWidth();
-		ImGui::SameLine();
-		if (ImGui::Button("Apply"))
-			sampler->resize(numSamples);
-		ImGui::SameLine();
-		if (ImGui::Button("Reset"))
-			numSamples = sampler->numSamples();
+
 		ImGui::SameLine();
 		if (ImGui::Button("Show"))
 		{
@@ -603,7 +605,7 @@ bool UserInterface::createLightGuiTree(pm::Light *light)
 				pm::AmbientOccluder *ambientOccluder = static_cast<pm::AmbientOccluder *>(light);
 				ImGui::InputFloat("Radiance Scale", &ambientOccluder->editRadianceScale());
 				ImGui::ColorEdit3("Color", ambientOccluder->editColor().data());
-				ImGui::InputFloat("Minimum Amount", &ambientOccluder->editMinAmount());
+				ImGui::ColorEdit3("Minimum Amount", ambientOccluder->editMinAmount().data());
 				break;
 			}
 			case pm::Light::Type::AREA:
@@ -694,17 +696,23 @@ bool UserInterface::createMaterialGuiTree(pm::Material *material)
 				pm::Matte *matte = static_cast<pm::Matte *>(material);
 				ImGui::InputFloat("Ambient Kd", &matte->ambient().editKd());
 				ImGui::ColorEdit3("Ambient Cd", matte->ambient().editCd().data());
-				const pm::Sampler::Type ambientSamplerType = matte->ambient().sampler()->type();
-				auxString_.format("%s Sampler", samplerTypeToString(ambientSamplerType));
-				createSamplerGuiTree(matte->ambient().sampler());
+				if (matte->ambient().sampler())
+				{
+					const pm::Sampler::Type ambientSamplerType = matte->ambient().sampler()->type();
+					auxString_.format("Ambient: %s Sampler", samplerTypeToString(ambientSamplerType));
+					createSamplerGuiTree(matte->ambient().sampler());
+				}
 				ImGui::PopID();
 
 				ImGui::PushID("Diffuse");
 				ImGui::InputFloat("Diffuse Kd", &matte->diffuse().editKd());
 				ImGui::ColorEdit3("Diffuse Cd", matte->diffuse().editCd().data());
-				const pm::Sampler::Type diffuseSamplerType = matte->diffuse().sampler()->type();
-				auxString_.format("%s Sampler", samplerTypeToString(diffuseSamplerType));
-				createSamplerGuiTree(matte->diffuse().sampler());
+				if (matte->diffuse().sampler())
+				{
+					const pm::Sampler::Type diffuseSamplerType = matte->diffuse().sampler()->type();
+					auxString_.format("Diffuse: %s Sampler", samplerTypeToString(diffuseSamplerType));
+					createSamplerGuiTree(matte->diffuse().sampler());
+				}
 				ImGui::PopID();
 				break;
 			}
@@ -717,7 +725,7 @@ bool UserInterface::createMaterialGuiTree(pm::Material *material)
 				if (phong->ambient().sampler())
 				{
 					const pm::Sampler::Type ambientSamplerType = phong->ambient().sampler()->type();
-					auxString_.format("%s Sampler", samplerTypeToString(ambientSamplerType));
+					auxString_.format("Ambient: %s Sampler", samplerTypeToString(ambientSamplerType));
 					createSamplerGuiTree(phong->ambient().sampler());
 				}
 				ImGui::PopID();
@@ -728,7 +736,7 @@ bool UserInterface::createMaterialGuiTree(pm::Material *material)
 				if (phong->diffuse().sampler())
 				{
 					const pm::Sampler::Type diffuseSamplerType = phong->diffuse().sampler()->type();
-					auxString_.format("%s Sampler", samplerTypeToString(diffuseSamplerType));
+					auxString_.format("Diffuse: %s Sampler", samplerTypeToString(diffuseSamplerType));
 					createSamplerGuiTree(phong->diffuse().sampler());
 				}
 				ImGui::PopID();
@@ -740,7 +748,7 @@ bool UserInterface::createMaterialGuiTree(pm::Material *material)
 				if (phong->specular().sampler())
 				{
 					const pm::Sampler::Type specularSamplerType = phong->specular().sampler()->type();
-					auxString_.format("%s Sampler", samplerTypeToString(specularSamplerType));
+					auxString_.format("Specular: %s Sampler", samplerTypeToString(specularSamplerType));
 					createSamplerGuiTree(phong->specular().sampler());
 				}
 				ImGui::PopID();

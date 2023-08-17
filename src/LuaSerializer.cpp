@@ -571,7 +571,7 @@ bool LuaSerializer::load(const char *filename, pm::World &world)
 				ambientOccluder->editCastShadows() = castShadows;
 				ambientOccluder->editRadianceScale() = nc::LuaUtils::retrieveField<float>(L, -1, Names::radianceScale);
 				ambientOccluder->editColor() = retrieveLuaColorFieldTable(L, -1, Names::color);
-				ambientOccluder->editMinAmount() = nc::LuaUtils::retrieveField<float>(L, -1, Names::minAmount);
+				ambientOccluder->editMinAmount() = retrieveLuaColorFieldTable(L, -1, Names::minAmount);
 				const unsigned int samplerIndex = nc::LuaUtils::retrieveField<uint32_t>(L, -1, Names::diffuseSamplerIndex);
 				ambientOccluder->setSampler(world.samplers()[samplerIndex].get());
 
@@ -817,7 +817,7 @@ void LuaSerializer::save(const char *filename, const pm::World &world)
 				const pm::AmbientOccluder *ambientOccluder = static_cast<const pm::AmbientOccluder *>(light);
 				indent(file, amount).formatAppend("%s = %f,\n", Names::radianceScale, ambientOccluder->radianceScale());
 				indent(file, amount).formatAppend("%s = {r = %f, g = %f, b = %f},\n", Names::color, ambientOccluder->color().r, ambientOccluder->color().g, ambientOccluder->color().b);
-				indent(file, amount).formatAppend("%s = %f\n", Names::minAmount, ambientOccluder->minAmount());
+				indent(file, amount).formatAppend("%s = {r = %f, g = %f, b = %f},\n", Names::minAmount, ambientOccluder->minAmount().r, ambientOccluder->minAmount().g, ambientOccluder->minAmount().b);
 				indent(file, amount).formatAppend("%s = %d,\n", Names::samplerIndex, samplerIndex(world, ambientOccluder->sampler()));
 				break;
 			}

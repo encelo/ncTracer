@@ -69,7 +69,7 @@ void setupSpheres(pm::World &world, pm::PinHole &camera, pm::Tracer::Type &trace
 	auto ambient = std::make_unique<pm::AmbientOccluder>();
 	ambient->setRadianceScale(0.01f);
 	ambient->setColor(0.25f, 0.25f, 0.25f);
-	ambient->setMinAmount(0.0f);
+	ambient->setMinAmount(0.25f, 0.25f, 0.25f);
 	ambient->setSampler(multiJittered);
 	world.setAmbientLight(std::move(ambient));
 #endif

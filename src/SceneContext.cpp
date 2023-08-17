@@ -73,7 +73,7 @@ void SceneContext::copyToTexture(unsigned char *pixelsPtr)
 	const int width = world_.viewPlane().width();
 	const int height = world_.viewPlane().height();
 
-	const float invGamma = 1.0f / 2.2f;
+	const float invGamma = world_.viewPlane().invGamma();
 
 	for (int r = 0; r < height; r++)
 	{
@@ -151,15 +151,19 @@ float SceneContext::tracingTime() const
 	return tracingTime_;
 }
 
-void SceneContext::savePbm(const char *filename)
+void SceneContext::savePbm(const char *filename, bool binary)
 {
+	char magicNumber[3] = {'P', '3', '\0'};
+	if (binary)
+		magicNumber[1] = '6';
+
 	const int width = world_.viewPlane().width();
 	const int height = world_.viewPlane().height();
-	const float invGamma = 1.0f / 2.2f;
+	const float invGamma = world_.viewPlane().invGamma();
 
 	std::ofstream file;
 	file.open(filename);
-	file << "P3\n" << width << " " << height << "\n" << 255 << "\n";
+	file << magicNumber << "\n" << width << " " << height << "\n" << 255 << "\n";
 	for (int i = height - 1; i >= 0; i--)
 	{
 		for (int j = 0; j < width; j++)
@@ -173,11 +177,19 @@ void SceneContext::savePbm(const char *filename)
 			tonemapped = tonemapped / (pm::RGBColor(1.0f, 1.0f, 1.0f) + tonemapped);
 			tonemapped.pow(invGamma);
 
-			file << unsigned(tonemapped.r * 255) << " ";
-			file << unsigned(tonemapped.g * 255) << " ";
-			file << unsigned(tonemapped.b * 255) << " ";
+			if (binary)
+			{
+				const char out[3] = { char(tonemapped.r * 255), char(tonemapped.g * 255), char(tonemapped.b * 255) };
+				file.write(out, sizeof(out));
+			}
+			else
+			{
+				const unsigned int out[3] = { unsigned(tonemapped.r * 255), unsigned(tonemapped.g * 255), unsigned(tonemapped.b * 255) };
+				file << out[0] << " " << out[1] << " " << out[2] << " ";
+			}
 		}
-		file << "\n";
+		if (binary == false)
+			file << "\n";
 	}
 	file.close();
 }
@@ -186,7 +198,7 @@ void SceneContext::savePng(const char *filename)
 {
 	const int width = world_.viewPlane().width();
 	const int height = world_.viewPlane().height();
-	const float invGamma = 1.0f / 2.2f;
+	const float invGamma = world_.viewPlane().invGamma();
 
 	nctl::UniquePtr<uint8_t[]> intPixels = nctl::makeUnique<uint8_t[]>(width * height * 3);
 	for (int i = 0; i < height; i++)
