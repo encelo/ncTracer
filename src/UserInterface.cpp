@@ -491,25 +491,25 @@ void UserInterface::cameraInteraction()
 	const pm::Vector3 right = cross(camera->up(), forward);
 	bool cameraChanged = false;
 
-	if (ImGui::IsKeyDown(ImGui::GetKeyIndex(ImGuiKey_UpArrow)))
+	if (ImGui::IsKeyDown(ImGuiKey_UpArrow))
 	{
 		camera->editEye() += forward * interaction.keyboardSpeed * deltaTime;
 		camera->editLookAt() += forward * interaction.keyboardSpeed * deltaTime;
 		cameraChanged = true;
 	}
-	if (ImGui::IsKeyDown(ImGui::GetKeyIndex(ImGuiKey_DownArrow)))
+	if (ImGui::IsKeyDown(ImGuiKey_DownArrow))
 	{
 		camera->editEye() -= forward * interaction.keyboardSpeed * deltaTime;
 		camera->editLookAt() -= forward * interaction.keyboardSpeed * deltaTime;
 		cameraChanged = true;
 	}
-	if (ImGui::IsKeyDown(ImGui::GetKeyIndex(ImGuiKey_RightArrow)))
+	if (ImGui::IsKeyDown(ImGuiKey_RightArrow))
 	{
 		camera->editEye() += right * interaction.keyboardSpeed * deltaTime;
 		camera->editLookAt() += right * interaction.keyboardSpeed * deltaTime;
 		cameraChanged = true;
 	}
-	if (ImGui::IsKeyDown(ImGui::GetKeyIndex(ImGuiKey_LeftArrow)))
+	if (ImGui::IsKeyDown(ImGuiKey_LeftArrow))
 	{
 		camera->editEye() -= right * interaction.keyboardSpeed * deltaTime;
 		camera->editLookAt() -= right * interaction.keyboardSpeed * deltaTime;
