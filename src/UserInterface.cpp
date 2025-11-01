@@ -157,7 +157,9 @@ UserInterface::UserInterface(VisualFeedback &vf, SceneContext &sc)
 	io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
 
 #ifdef __ANDROID__
-	io.FontGlobalScale = 2.0f;
+	ImGuiStyle &style = ImGui::GetStyle();
+	style.FontScaleMain = 2.0f;
+	style.ScaleAllSizes(2.0f);
 #endif
 
 	cameraState.saveFrom(*sc_.config().camera);

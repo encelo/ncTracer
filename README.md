@@ -7,6 +7,8 @@
 [![CodeQL](https://github.com/encelo/ncTracer/workflows/CodeQL/badge.svg)](https://github.com/encelo/ncTracer/actions?workflow=CodeQL)
 
 # ncTracer
+![Screenshot](https://ncine.github.io/img/gallery/ncTracer.png "Screenshot")
+
 An [ImGui](https://github.com/ocornut/imgui) front-end to the [pmTracer](https://github.com/encelo/pmTracer) library made with the [nCine](https://github.com/nCine/nCine).
 
 **Poor Man's Tracer** is a very simple and minimal ray tracing and path tracing library based on [_Ray Tracing from the Ground Up_](http://www.raytracegroundup.com/) by Kevin Suffern.

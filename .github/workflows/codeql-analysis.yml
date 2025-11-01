@@ -26,7 +26,7 @@ jobs:
     - run: |
         # Install nCine Build Dependencies
         sudo apt-get update
-        sudo apt-get install -y libgl-dev libxext-dev
+        sudo apt-get install -y libgl-dev libxext-dev libxrandr-dev libwayland-dev
 
         # Download nCine-libraries, pmTracer, and project data
         export OS=linux
