@@ -7,6 +7,9 @@
 #include "World.h"
 #include "Camera.h"
 
+#include <nctl/StaticString.h>
+#include <ncine/tracy.h>
+
 namespace {
 
 bool stopThreads = false;
@@ -108,10 +111,11 @@ void ThreadManager::threadFunc(void *arg)
 
 	#if !defined(__EMSCRIPTEN__)
 	nctl::String threadName;
-	threadName.format("Thread#%2.d", id);
-	nc::Thread::setSelfName(threadName.data());
+	threadName.format("Thread#%.2d", id);
+	nc::ThisThread::setName(threadName.data());
 	#endif
 #endif
+	ZoneScoped;
 	tls.hasFinished = false;
 	tls.progress = 0.0f;
 
@@ -127,6 +131,8 @@ void ThreadManager::threadFunc(void *arg)
 
 	while (tls.hasFinished == false && stopThreads == false)
 	{
+		ZoneScopedN("Tiled renderScene");
+
 		const int index = (iteration * conf.numThreads) + id;
 		int column = index % numColumns;
 		int row = index / numColumns;
@@ -148,6 +154,11 @@ void ThreadManager::threadFunc(void *arg)
 		const int startY = row * conf.tileSize;
 		const int tileSizeX = (startX + conf.tileSize > width) ? width - startX : conf.tileSize;
 		const int tileSizeY = (startY + conf.tileSize > height) ? height - startY : conf.tileSize;
+
+		nctl::StaticString<64> zoneTextString;
+		zoneTextString.format("Index: %d - Col: %d, Row: %d - (%d, %d), (%d, %d)",
+		                      index, column, row, startX, startY, startX + tileSizeX, startY + tileSizeY);
+		ZoneText(zoneTextString.data(), zoneTextString.length());
 
 		conf.camera->renderScene(*conf.world, *conf.tracer, conf.frame, startX, startY, tileSizeX, tileSizeY, true);
 		iteration++;

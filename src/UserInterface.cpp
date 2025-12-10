@@ -548,7 +548,7 @@ void UserInterface::createSamplerGuiTree(pm::Sampler *sampler)
 		if (ImGui::InputInt("Samples", &numSamples))
 		{
 			if (numSamples < 1)
-				numSamples != sampler->numSamples();
+				numSamples = sampler->numSamples();
 
 			if (numSamples > 0 && numSamples != sampler->numSamples())
 				sampler->resize(numSamples);

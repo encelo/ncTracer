@@ -11,9 +11,12 @@
 	namespace nc = ncine;
 #endif
 
-#include "World.h"
-#include "PinHole.h"
-#include "RGBColor.h"
+namespace pm {
+	class World;
+	class Tracer;
+	class Camera;
+	class RGBColor;
+}
 
 /// Threads management class
 class ThreadManager
