@@ -3,7 +3,7 @@
 #include "SceneContext.h"
 #include "ObjectsPool.h"
 
-#include <ncine/TextureSaverPng.h>
+#include <ncine/ImageSaverPng.h>
 
 void initWorld(pm::World &world, pm::PinHole &camera, pm::Tracer::Type &tracerType);
 
@@ -222,11 +222,11 @@ void SceneContext::savePng(const char *filename)
 		}
 	}
 
-	nc::TextureSaverPng saver;
-	nc::TextureSaverPng::Properties props;
+	nc::ImageSaverPng saver;
+	nc::ImageSaverPng::Properties props;
 	props.width = width;
 	props.height = height;
-	props.format = nc::TextureSaverPng::Format::RGB8;
+	props.format = nc::ImageSaverPng::Format::RGB8;
 	props.pixels = intPixels.get();
 	saver.saveToFile(props, filename);
 }
