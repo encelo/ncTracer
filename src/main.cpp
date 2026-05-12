@@ -38,20 +38,20 @@ void MyEventHandler::onPreInit(nc::AppConfiguration &config)
 	config.dataPath() = dataPath;
 #endif
 
-	config.resolution.x = imageWidth;
-	config.resolution.y = imageHeight;
+	config.logging.consoleLevel = nc::ILogger::LogLevel::WARN;
 
-	config.withScenegraph = false;
-	config.withAudio = false;
-	config.withDebugOverlay = false;
-	config.withJobSystem = false;
-	config.resizable = true;
-	config.vaoPoolSize = 1;
+	config.window.resolution.x = imageWidth;
+	config.window.resolution.y = imageHeight;
+	config.window.resizable = true;
+	config.window.title = "ncTracer";
+	config.window.iconFilename = "icon48.png";
 
-	config.windowTitle = "ncTracer";
-	config.windowIconFilename = "icon48.png";
+	config.graphics.opengl.vaoPoolSize = 1;
 
-	config.consoleLogLevel = nc::ILogger::LogLevel::WARN;
+	config.audio.enabled = false;
+	config.jobSystem.enabled = false;
+	config.features.scenegraph = false;
+	config.features.debugOverlay = false;
 }
 
 void MyEventHandler::onInit()
