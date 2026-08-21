@@ -11,7 +11,7 @@
 
 An [ImGui](https://github.com/ocornut/imgui) front-end to the [pmTracer](https://github.com/encelo/pmTracer) library made with the [nCine](https://github.com/nCine/nCine).
 
-**Poor Man's Tracer** is a very simple and minimal ray tracing and path tracing library based on [_Ray Tracing from the Ground Up_](http://www.raytracegroundup.com/) by Kevin Suffern.
+**Poor Man's Tracer** is a very simple and minimal ray tracing and path tracing library based on [_Ray Tracing from the Ground Up_](https://web.archive.org/web/20210506181127/https://www.raytracegroundup.com/) by Kevin Suffern.
 
 ## Notes
 * Don't forget to compile the nCine with `-D NCINE_DYNAMIC_LIBRARY=OFF` so that ncTracer can access the OpenGL and threading private API.
